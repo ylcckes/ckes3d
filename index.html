@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>雲林縣林內鄉成功國小 — 3D 校園空間與教室互動導覽</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Noto Sans TC', 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
+    #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    #labels-container { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; overflow: hidden; }
+    .poi-label {
+      position: absolute; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;
+      white-space: nowrap; padding: 3px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700;
+      display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 3px 10px rgba(0,0,0,0.42);
+      border: 1.5px solid rgba(255,255,255,0.85); transition: transform 0.15s ease, box-shadow 0.15s ease; backdrop-filter: blur(4px);
+    }
+    .poi-label:hover { transform: translate(-50%, -108%) scale(1.12); z-index: 50 !important; }
+    .poi-label.active-poi { transform: translate(-50%, -112%) scale(1.16); z-index: 60 !important; outline: 2.5px solid #facc15; box-shadow: 0 0 18px rgba(250,204,21,0.85); }
+    .poi-label::after { content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); border-width: 5px 4px 0 4px; border-style: solid; border-color: rgba(255,255,255,0.9) transparent transparent transparent; }
+    .badge-1f { background: rgba(71,85,105,0.94); color: #fff; }
+    .badge-2f { background: rgba(190,24,93,0.92); color: #fff; }
+    .badge-sport { background: rgba(234,88,12,0.92); color: #fff; }
+    .badge-eco { background: rgba(5,150,105,0.92); color: #fff; }
+    .badge-gate { background: rgba(37,99,235,0.92); color: #fff; }
+    .badge-util { background: rgba(51,65,85,0.92); color: #f1f5f9; font-size: 10px; padding: 2px 6px; }
+    .road-label { position: absolute; transform: translate(-50%, -50%); pointer-events: none; white-space: nowrap; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; background: rgba(15,23,42,0.78); color: #e2e8f0; border: 1px dashed rgba(148,163,184,0.6); }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(15,23,42,0.4); }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.45); border-radius: 9999px; }
+    .glass-panel { background: rgba(15,23,42,0.84); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.14); }
+  </style>
+</head>
+<body class="relative w-full h-full overflow-hidden select-none">
+  <div id="canvas-container"></div>
+  <div id="labels-container"></div>
+
+  <header class="fixed top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <div class="glass-panel pointer-events-auto rounded-2xl px-3.5 py-2 flex items-center gap-3 shadow-xl">
+      <button id="btn-toggle-sidebar" class="p-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 transition" title="展開/收合清單">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white">雲林縣林內鄉成功國小 3D 校園導覽</h1>
+        </div>
+        <p id="status-subtitle" class="text-[11px] text-slate-300 hidden sm:block">已恢復晴天球場與各車棚立柱｜四輪黑色轎車｜原版中庭花園與自然疊石生態池</p>
+      </div>
+    </div>
+
+    <div class="glass-panel pointer-events-auto rounded-2xl p-1.5 flex flex-wrap items-center gap-1.5 shadow-xl">
+      <div class="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-slate-700/70">
+        <button id="mode-orbit-btn" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow"><span>🦅</span><span>自由查看設施</span></button>
+        <button id="mode-walk-btn" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white"><span>🚶</span><span>人物自由走動</span></button>
+      </div>
+      <button id="btn-walk-pov" class="hidden px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 border border-amber-400/50 text-amber-200 hover:bg-amber-500/30 transition">視角：第三人稱</button>
+      <button id="btn-toggle-sublabels" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition">🏷️ 全部標籤：開</button>
+      <button id="btn-hide-all-labels" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-900/70 hover:bg-rose-700 text-rose-100 border border-rose-500/50 transition">🚫 關閉所有標籤</button>
+      <button id="btn-time-of-day" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-600/60 transition">☀️ 晴朗日間</button>
+      <button id="btn-reset-camera" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition">🔄 全景</button>
+    </div>
+  </header>
+
+  <aside id="sidebar-panel" class="fixed top-20 left-3 bottom-3 w-72 sm:w-80 z-20 glass-panel rounded-2xl flex flex-col shadow-2xl transition-transform duration-300">
+    <div class="p-3 border-b border-slate-700/70 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">校園空間與教室清單</span>
+        <span id="poi-count-badge" class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">47 個空間</span>
+      </div>
+      <div class="relative">
+        <input id="search-input" type="text" placeholder="搜尋教室、晴天球場、生態池、車庫..." class="w-full bg-slate-900/90 text-xs text-white placeholder-slate-400 rounded-xl pl-8 pr-7 py-2 border border-slate-700 focus:outline-none focus:border-indigo-400" />
+        <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <button id="btn-clear-search" class="hidden absolute right-2 top-2 text-slate-400 hover:text-white text-xs">✕</button>
+      </div>
+      <div class="grid grid-cols-3 gap-1 pt-0.5">
+        <button data-cat="all" class="cat-tab px-2 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 text-white transition">全部空間</button>
+        <button data-cat="1f" class="cat-tab px-2 py-1 rounded-lg text-[11px] font-bold bg-slate-700/80 text-slate-200 hover:bg-slate-600 border border-slate-500/40 transition">1F 教室/行政</button>
+        <button data-cat="2f" class="cat-tab px-2 py-1 rounded-lg text-[11px] font-bold bg-pink-900/50 text-pink-200 hover:bg-pink-800/70 border border-pink-500/40 transition">2F 教室/專科</button>
+        <button data-cat="sport" class="cat-tab px-2 py-1 rounded-lg text-[11px] font-bold bg-orange-900/50 text-orange-200 hover:bg-orange-800/70 border border-orange-500/40 transition">運動與集會</button>
+        <button data-cat="eco" class="cat-tab px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-900/50 text-emerald-200 hover:bg-emerald-800/70 border border-emerald-500/40 transition">花園與展館</button>
+        <button data-cat="gate" class="cat-tab px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-900/50 text-blue-200 hover:bg-blue-800/70 border border-blue-500/40 transition">校門與車棚</button>
+      </div>
+    </div>
+    <div id="poi-list" class="flex-1 overflow-y-auto p-2.5 space-y-1.5"></div>
+    <div class="p-2.5 border-t border-slate-700/70 bg-slate-900/70 rounded-b-2xl space-y-1.5">
+      <div class="flex items-center justify-between text-[11px] text-slate-300">
+        <span>快速傳送體驗</span>
+        <span id="char-floor-indicator" class="px-2 py-0.5 rounded bg-slate-700 text-amber-300 font-bold">位置：1F 中庭生態池</span>
+      </div>
+      <div class="grid grid-cols-3 gap-1">
+        <button id="btn-go-pond" class="px-1.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-700/85 hover:bg-emerald-600 text-white transition flex items-center justify-center gap-1"><span>🌿</span><span>中庭生態池</span></button>
+        <button id="btn-go-sunny" class="px-1.5 py-1.5 rounded-xl text-[11px] font-bold bg-sky-700/85 hover:bg-sky-600 text-white transition flex items-center justify-center gap-1"><span>🏀</span><span>晴天球場</span></button>
+        <button id="btn-go-car" class="px-1.5 py-1.5 rounded-xl text-[11px] font-bold bg-amber-600/90 hover:bg-amber-500 text-white transition flex items-center justify-center gap-1"><span>🚗</span><span>後車庫黑車</span></button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="minimap-panel" class="fixed top-20 right-3 z-20 glass-panel rounded-2xl p-2.5 shadow-2xl w-60 sm:w-64 transition-all">
+    <div class="flex items-center justify-between mb-1.5">
+      <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-xs font-bold text-slate-200">校園平面雷達圖</span></div>
+      <div class="flex items-center gap-1">
+        <button id="btn-minimap-floor" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-white font-bold hover:bg-slate-600 transition">平面：1F</button>
+        <button id="btn-toggle-minimap" class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white">—</button>
+      </div>
+    </div>
+    <div id="minimap-body">
+      <canvas id="minimap-canvas" width="240" height="175" class="w-full h-auto rounded-xl border border-slate-700 cursor-crosshair bg-slate-900"></canvas>
+      <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-400"><span>⬅️ 往林內市區</span><span>坪頂路</span><span>往坪頂社區 ➡️</span></div>
+    </div>
+  </div>
+
+  <div id="car-prompt-banner" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-2xl px-4 py-2 border border-amber-400/60 shadow-2xl flex items-center gap-3 pointer-events-auto">
+    <span id="car-prompt-text" class="text-xs sm:text-sm font-extrabold text-amber-300">🚗 靠近北側車庫四輪黑色轎車</span>
+    <button id="btn-toggle-drive" class="px-3 py-1 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow">🔑 上車駕駛 (F)</button>
+  </div>
+
+  <div id="selected-banner" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 glass-panel rounded-2xl px-4 py-2.5 shadow-2xl flex items-center gap-3 max-w-xl w-[92%] sm:w-auto pointer-events-auto transition-all">
+    <div id="selected-badge" class="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-600 text-white shrink-0">中庭花園 & 生態池</div>
+    <div class="min-w-0 flex-1">
+      <div id="selected-title" class="text-xs sm:text-sm font-bold text-white truncate">中庭花園、自然疊石生態池、晴天球場與北側車庫黑色轎車</div>
+      <div id="selected-Zone" class="text-[11px] text-slate-300 truncate">已完整恢復晴天球場與車庫立柱、黑色四輪轎車、以及原版中庭花園與生態池</div>
+    </div>
+    <button id="btn-teleport-here" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition shadow">📍 傳送人物至此</button>
+  </div>
+
+  <div id="walk-hud" class="hidden fixed bottom-20 right-3 z-20 glass-panel rounded-2xl p-3 shadow-2xl w-56">
+    <div class="flex items-center justify-between mb-2">
+      <span id="hud-mode-title" class="text-xs font-bold text-amber-300 flex items-center gap-1">🎮 人物走動控制</span>
+      <span class="text-[10px] text-slate-400">WASD / 方向鍵</span>
+    </div>
+    <div class="grid grid-cols-3 gap-1.5 text-center">
+      <button id="pad-q" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-slate-300">↺ 左轉</button>
+      <button id="pad-w" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-sm font-extrabold text-white">▲ 前進</button>
+      <button id="pad-e" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-slate-300">右轉 ↻</button>
+      <button id="pad-a" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-white">◀ 左移</button>
+      <button id="pad-s" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-sm font-extrabold text-white">▼ 後退</button>
+      <button id="pad-d" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-white">右移 ▶</button>
+    </div>
+    <div class="grid grid-cols-2 gap-1.5 mt-2">
+      <button id="pad-jump" class="py-1.5 rounded-xl bg-amber-600/80 hover:bg-amber-500 text-xs font-bold text-white">⏫ 跳躍 (Space)</button>
+      <button id="pad-sprint" class="py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-xs font-bold text-white">⚡ 跑步：關</button>
+    </div>
+    <p class="mt-2 text-[10px] text-slate-300 leading-snug">💡 人物身穿淡紫蝴蝶上衣；靠近北側車庫黑色轎車可按 <b>F</b> 鍵開車！</p>
+  </div>
+
+  <script>
+    const CAMPUS_POIS = [
+      { id: '1f-1a', name: '一甲', fullTitle: '一年甲班教室 (1F)', category: '1f', floor: 1, x: -9.0, y: 0.3, z: -17.2, camOffset: [0, 7, 15], walkPos: [-9.0, -15.2, Math.PI], zone: '教學大樓 1F 西段', isSub: false },
+      { id: '1f-prep-w1', name: '備課室 (一甲旁)', fullTitle: '1F 西側左備課室', category: '1f', floor: 1, x: -0.8, y: 0.3, z: -17.2, camOffset: [0, 6, 13], walkPos: [-0.8, -15.2, Math.PI], zone: '教學大樓 1F 西側', isSub: true },
+      { id: '1f-wc-w1', name: '廁所 (一甲旁)', fullTitle: '1F 西側左廁所 (W.C.)', category: '1f', floor: 1, x: -0.8, y: 0.3, z: -26.0, camOffset: [0, 9, 16], walkPos: [-0.8, -15.2, Math.PI], zone: '教學大樓 1F 西側', isSub: true },
+      { id: '1f-prep-w2', name: '備課室 (二甲旁)', fullTitle: '1F 西側右備課室', category: '1f', floor: 1, x: 4.5, y: 0.3, z: -17.2, camOffset: [0, 6, 13], walkPos: [4.5, -15.2, Math.PI], zone: '教學大樓 1F 西側', isSub: true },
+      { id: '1f-wc-w2', name: '廁所 (二甲旁)', fullTitle: '1F 西側右廁所 (W.C.)', category: '1f', floor: 1, x: 4.5, y: 0.3, z: -26.0, camOffset: [0, 9, 16], walkPos: [4.5, -15.2, Math.PI], zone: '教學大樓 1F 西側', isSub: true },
+      { id: '1f-2a', name: '二甲', fullTitle: '二年甲班教室 (1F)', category: '1f', floor: 1, x: 13.5, y: 0.3, z: -17.2, camOffset: [0, 7, 15], walkPos: [13.5, -15.2, Math.PI], zone: '教學大樓 1F 中西段', isSub: false },
+      { id: '1f-3a', name: '三甲', fullTitle: '三年甲班教室 (1F)', category: '1f', floor: 1, x: 25.0, y: 0.3, z: -17.2, camOffset: [-6, 7, 15], walkPos: [20.0, -15.2, Math.PI], zone: '教學大樓 1F 中段', isSub: false },
+      { id: '1f-wc-mid', name: '廁所 (1F中央)', fullTitle: '教學大樓 1F 中央廁所 (W.C.)', category: '1f', floor: 1, x: 34.0, y: 0.3, z: -17.2, camOffset: [0, 7, 14], walkPos: [34.0, -15.2, Math.PI], zone: '教學大樓 1F 中央', isSub: true },
+      { id: '1f-stairs', name: '健康中心邊樓梯', fullTitle: '教學樓雙跑折返樓梯（左半下半層至 0.5F 平台、轉 180° 右半上半層至 2F）', category: '1f', floor: 1, x: 44.2, y: 0.3, z: -17.2, camOffset: [-2, 6, 12], walkPos: [42.8, -15.2, 0], zone: '教學大樓 1F ⇄ 2F 折返樓梯', isSub: false },
+      { id: '1f-wc-east', name: '廁所 W.C. (紫磁磚門框)', fullTitle: '健康中心旁紫色磁磚框廁所 (W.C.)', category: '1f', floor: 1, x: 50.5, y: 0.3, z: -17.2, camOffset: [0, 6, 12], walkPos: [50.5, -15.2, Math.PI], zone: '健康中心邊樓梯右側', isSub: true },
+      { id: '1f-health', name: '健康中心 ➕', fullTitle: '健康中心 Health Center (1F)', category: '1f', floor: 1, x: 60.0, y: 0.3, z: -17.2, camOffset: [0, 7, 15], walkPos: [60.0, -15.2, Math.PI], zone: '教學大樓 1F 東段', isSub: false },
+      { id: '1f-confucius', name: '孔子銅像 (至聖先師)', fullTitle: '健康中心前至聖先師孔子銅像與修剪龍柏', category: '1f', floor: 1, x: 59.5, y: 0.3, z: -10.8, camOffset: [0, 5, 11], walkPos: [59.5, -7.2, Math.PI], zone: '健康中心前方草坪', isSub: false },
+      { id: '1f-counsel', name: '輔導室 / 研究室', fullTitle: '輔導室與教師研究室 (1F)', category: '1f', floor: 1, x: 73.0, y: 0.3, z: -17.2, camOffset: [0, 7, 15], walkPos: [73.0, -15.2, Math.PI], zone: '教學大樓 1F 東段', isSub: false },
+      { id: '1f-pingpong', name: '桌球室', fullTitle: '桌球室 (1F)', category: '1f', floor: 1, x: 86.0, y: 0.3, z: -17.2, camOffset: [0, 7, 15], walkPos: [86.0, -15.2, Math.PI], zone: '教學大樓 1F 最東側', isSub: false },
+      { id: '1f-office-stairs', name: '一樓辦公室邊樓梯', fullTitle: '行政樓雙跑折返樓梯（右半下半層至 0.5F 平台、轉 180° 左半上半層至 2F）', category: '1f', floor: 1, x: 25.0, y: 0.3, z: -8.9, camOffset: [-15, 6, 5], walkPos: [22.8, -7.1, -Math.PI / 2], zone: '辦公大樓 1F ⇄ 2F 折返樓梯', isSub: false },
+      { id: '1f-office', name: '辦公室', fullTitle: '辦公大樓 1F 辦公室（附門廊紅聯與鋁窗）', category: '1f', floor: 1, x: 25.0, y: 0.3, z: 2.0, camOffset: [-18, 7, 8], walkPos: [22.8, 2.0, -Math.PI / 2], zone: '辦公大樓 1F 北段', isSub: false },
+      { id: '1f-computer', name: '電腦教室', fullTitle: '辦公大樓 1F 電腦教室', category: '1f', floor: 1, x: 25.0, y: 0.3, z: 15.5, camOffset: [-18, 7, 8], walkPos: [22.8, 15.5, -Math.PI / 2], zone: '辦公大樓 1F 中段', isSub: false },
+      { id: '1f-principal', name: '校長室', fullTitle: '辦公大樓 1F 校長室', category: '1f', floor: 1, x: 25.0, y: 0.3, z: 29.0, camOffset: [-18, 7, 8], walkPos: [22.8, 29.0, -Math.PI / 2], zone: '辦公大樓 1F 南段', isSub: false },
+      { id: '1f-dorm', name: '宿舍一樓', fullTitle: '教職員宿舍一樓 (1F)', category: '1f', floor: 1, x: 28.0, y: 0.3, z: -50.0, camOffset: [0, 12, 22], walkPos: [28.0, -44.0, Math.PI], zone: '北側宿舍區 1F', isSub: false },
+      { id: '2f-4a', name: '四甲', fullTitle: '四年甲班教室 (2F)', category: '2f', floor: 2, x: -9.0, y: 4.5, z: -17.2, camOffset: [0, 8, 16], walkPos: [-9.0, -15.2, Math.PI], zone: '教學大樓 2F 西段', isSub: false },
+      { id: '2f-wash-w1', name: '盥洗室 (2F)', fullTitle: '2F 西側盥洗室', category: '2f', floor: 2, x: -0.8, y: 4.5, z: -26.0, camOffset: [0, 9, 16], walkPos: [-0.8, -15.2, Math.PI], zone: '教學大樓 2F 西側', isSub: true },
+      { id: '2f-prep-w1', name: '備課室 (四甲旁)', fullTitle: '2F 西側左備課室', category: '2f', floor: 2, x: -0.8, y: 4.5, z: -17.2, camOffset: [0, 7, 14], walkPos: [-0.8, -15.2, Math.PI], zone: '教學大樓 2F 西側', isSub: true },
+      { id: '2f-wc-w2', name: '廁所 (五甲旁)', fullTitle: '2F 西側右廁所', category: '2f', floor: 2, x: 4.5, y: 4.5, z: -26.0, camOffset: [0, 9, 16], walkPos: [4.5, -15.2, Math.PI], zone: '教學大樓 2F 西側', isSub: true },
+      { id: '2f-prep-w2', name: '備課室 (五甲旁)', fullTitle: '2F 西側右備課室', category: '2f', floor: 2, x: 4.5, y: 4.5, z: -17.2, camOffset: [0, 7, 14], walkPos: [4.5, -15.2, Math.PI], zone: '教學大樓 2F 西側', isSub: true },
+      { id: '2f-5a', name: '五甲', fullTitle: '五年甲班教室 (2F)', category: '2f', floor: 2, x: 13.5, y: 4.5, z: -17.2, camOffset: [0, 8, 16], walkPos: [13.5, -15.2, Math.PI], zone: '教學大樓 2F 中西段', isSub: false },
+      { id: '2f-6a', name: '六甲', fullTitle: '六年甲班教室 (2F)', category: '2f', floor: 2, x: 25.0, y: 4.5, z: -17.2, camOffset: [-6, 8, 16], walkPos: [20.0, -15.2, Math.PI], zone: '教學大樓 2F 中段', isSub: false },
+      { id: '2f-wc-mid', name: '廁所 (2F中央)', fullTitle: '教學大樓 2F 中央廁所', category: '2f', floor: 2, x: 34.0, y: 4.5, z: -17.2, camOffset: [0, 8, 15], walkPos: [34.0, -15.2, Math.PI], zone: '教學大樓 2F 中央', isSub: true },
+      { id: '2f-science', name: '自然教室', fullTitle: '自然科學專科教室 (2F)', category: '2f', floor: 2, x: 60.0, y: 4.5, z: -17.2, camOffset: [0, 8, 16], walkPos: [60.0, -15.2, Math.PI], zone: '教學大樓 2F 東段', isSub: false },
+      { id: '2f-tea', name: '茶道教室', fullTitle: '特色茶道教室 (2F)', category: '2f', floor: 2, x: 73.0, y: 4.5, z: -17.2, camOffset: [0, 8, 16], walkPos: [73.0, -15.2, Math.PI], zone: '教學大樓 2F 東段', isSub: false },
+      { id: '2f-english', name: '英語教室', fullTitle: '英語專科教室 (2F)', category: '2f', floor: 2, x: 86.0, y: 4.5, z: -17.2, camOffset: [0, 8, 16], walkPos: [86.0, -15.2, Math.PI], zone: '教學大樓 2F 最東側', isSub: false },
+      { id: '2f-library', name: '圖書館 / 讀報中心', fullTitle: '辦公大樓 2F 圖書館與讀報中心', category: '2f', floor: 2, x: 25.0, y: 4.5, z: 6.5, camOffset: [-20, 8, 10], walkPos: [22.8, 6.5, -Math.PI / 2], zone: '辦公大樓 2F 北中段', isSub: false },
+      { id: '2f-music', name: '音樂教室', fullTitle: '辦公大樓 2F 音樂專科教室', category: '2f', floor: 2, x: 25.0, y: 4.5, z: 26.5, camOffset: [-20, 8, 10], walkPos: [22.8, 26.5, -Math.PI / 2], zone: '辦公大樓 2F 南段', isSub: false },
+      { id: '2f-dorm', name: '宿舍二樓', fullTitle: '教職員宿舍二樓 (2F)', category: '2f', floor: 2, x: 28.0, y: 4.5, z: -57.0, camOffset: [0, 14, 24], walkPos: [28.0, -44.0, Math.PI], zone: '北側宿舍區 2F', isSub: false },
+      { id: 'sp-track', name: '操場跑道', fullTitle: '4道紅褐色 PU 環形跑道與北側直線跑道', category: 'sport', floor: 1, x: -53.5, y: 0.2, z: 16.0, camOffset: [0, 28, 38], walkPos: [-53.5, 4.0, Math.PI], zone: '西側運動園區', isSub: false },
+      { id: 'sp-bball', name: '4 籃球場', fullTitle: '西側戶外籃球場（編號 4）', category: 'sport', floor: 1, x: -90.5, y: 0.2, z: 27.5, camOffset: [22, 18, 24], walkPos: [-80.5, 27.5, Math.PI / 2], zone: '跑道西側運動區', isSub: false },
+      { id: 'sp-bwall', name: '紫蝶牆', fullTitle: '籃球場西側紫斑蝶馬賽克彩繪牆', category: 'sport', floor: 1, x: -99.5, y: 2.2, z: 27.5, camOffset: [18, 8, 12], walkPos: [-93.5, 27.5, Math.PI / 2], zone: '西側運動園區', isSub: false },
+      { id: 'sp-stage', name: '2 司令台', fullTitle: '操場北側無頂司令台（編號 2，後方茂密樹林）', category: 'sport', floor: 1, x: -53.5, y: 1.2, z: -2.2, camOffset: [0, 10, 20], walkPos: [-53.5, 3.6, Math.PI], zone: '直線跑道北側中央', isSub: false },
+      { id: 'sp-play', name: '兒童遊戲區', fullTitle: '兒童遊戲區（彩色流蘇遮陽棚、溜滑梯轉90度朝東向人物方向滑出）', category: 'sport', floor: 1, x: -89.2, y: 0.5, z: 7.4, camOffset: [15, 9, 14], walkPos: [-80.2, 7.4, Math.PI / 2], zone: '直線跑道西端藍框區', isSub: false },
+      { id: 'sp-wc-west', name: '3 廁所 (操場側)', fullTitle: '操場西北側紫斑蝶馬賽克廁所（編號 3）', category: 'sport', floor: 1, x: -76.5, y: 0.4, z: -5.0, camOffset: [6, 10, 18], walkPos: [-74.0, 2.6, Math.PI], zone: '直線跑道西北側', isSub: false },
+      { id: 'sp-hall', name: '1 思源堂', fullTitle: '思源堂集會禮堂（編號 1）', category: 'sport', floor: 1, x: -35.5, y: 0.4, z: -12.5, camOffset: [0, 14, 24], walkPos: [-35.5, 3.6, Math.PI], zone: '直線跑道東北側', isSub: false },
+      { id: 'sp-kitchen', name: '廚房', fullTitle: '學校營養午餐廚房（後方緊鄰機車車棚）', category: 'sport', floor: 1, x: -25.8, y: 0.4, z: -12.5, camOffset: [0, 14, 24], walkPos: [-25.8, 3.6, Math.PI], zone: '思源堂東側', isSub: false },
+      { id: 'sp-sunnycourt', name: '晴天球場', fullTitle: '晴天球場（半戶外風雨籃球場，含10根天藍色鋼柱與籃球架）', category: 'sport', floor: 1, x: 68, y: 0.3, z: -54, camOffset: [-24, 18, 26], walkPos: [50, -54, -Math.PI / 2], zone: '校園東北角', isSub: false },
+      { id: 'eco-courtyard', name: '中庭花園', fullTitle: '中庭花園（蜿蜒卵石旱溪水道、石板小橋、雕花石甕景觀與四季花壇）', category: 'eco', floor: 1, x: 4.5, y: 0.2, z: 8.5, camOffset: [-14, 12, 18], walkPos: [14.8, 9.6, Math.PI / 2], zone: '辦公大樓西側中庭', isSub: false },
+      { id: 'eco-pond', name: '生態池', fullTitle: '中庭自然疊石水生植物生態池（28顆景觀疊石護岸、睡蓮蓮花、香蒲與木棧平台）', category: 'eco', floor: 1, x: 4.2, y: 0.2, z: 21.5, camOffset: [-12, 10, 16], walkPos: [14.8, 21.5, Math.PI / 2], zone: '中庭花園南側', isSub: false },
+      { id: 'eco-mahogany', name: '高大桃花心木 (2倍高)', fullTitle: '校門進來操場側兩倍高巨型桃花心木與紫斑蝶雕塑柱', category: 'eco', floor: 1, x: -25.2, y: 0.3, z: 52.0, camOffset: [16, 14, 20], walkPos: [-17.5, 48.0, Math.PI / 2], zone: '校門左側綠籬旁', isSub: false },
+      { id: 'eco-butterfly', name: '蝴蝶故事館', fullTitle: '紫斑蝶蝴蝶故事館（前方設白色磁磚矮牆）', category: 'eco', floor: 1, x: 6, y: 0.4, z: 55, camOffset: [-12, 10, 20], walkPos: [6, 46, 0], zone: '校門口東側展館', isSub: false },
+      { id: 'eco-caifeng', name: '坪頂採風館', fullTitle: '坪頂採風館（前方設白色磁磚矮牆）', category: 'eco', floor: 1, x: 26, y: 0.4, z: 55, camOffset: [0, 10, 20], walkPos: [26, 46, 0], zone: '蝴蝶故事館東側', isSub: false },
+      { id: 'eco-garden', name: '花園', fullTitle: '東側生態花園', category: 'eco', floor: 1, x: 72, y: 0.2, z: 2, camOffset: [0, 20, 26], walkPos: [70, 2, Math.PI], zone: '教學大樓南側花園', isSub: false },
+      { id: 'eco-greenhouse', name: '溫室', fullTitle: '紫斑蝶蜜源植物溫室', category: 'eco', floor: 1, x: 56, y: 0.3, z: 15, camOffset: [16, 14, 20], walkPos: [64, 15, Math.PI / 2], zone: '東側花園西區', isSub: false },
+      { id: 'eco-path', name: '石板步道 (紫蝶步道)', fullTitle: '花園石板步道（紫蝶生態步道）', category: 'eco', floor: 1, x: 76, y: 0.2, z: 21, camOffset: [14, 16, 22], walkPos: [76, 21, Math.PI], zone: '東側花園步道區', isSub: false },
+      { id: 'gt-main', name: '校門口', fullTitle: '成功國小校門口（洗石子直溝紋門柱、馬賽克紅紫彩帶、立體紫斑蝶雕塑與白色矮牆）', category: 'gate', floor: 1, x: -16, y: 0.2, z: 64, camOffset: [0, 6, 15], walkPos: [-16, 56, 0], zone: '南側坪頂路主入口', isSub: false },
+      { id: 'gt-side', name: '側門', fullTitle: '南側偏東側門', category: 'gate', floor: 1, x: 52, y: 0.2, z: 62, camOffset: [0, 12, 20], walkPos: [52, 54, Math.PI], zone: '南側坪頂路東段', isSub: false },
+      { id: 'gt-back', name: '後門', fullTitle: '校園北側後門', category: 'gate', floor: 1, x: -16, y: 0.2, z: -66, camOffset: [0, 14, 20], walkPos: [-16, -58, 0], zone: '北側邊界', isSub: false },
+      { id: 'gt-scooter', name: '機車車棚 (廚房後)', fullTitle: '廚房正後方綠色波浪頂機車車棚（含6根不鏽鋼立柱支撐）', category: 'gate', floor: 1, x: -25.8, y: 0.3, z: -29.5, camOffset: [12, 8, 12], walkPos: [-17.5, -29.5, Math.PI / 2], zone: '廚房正後方', isSub: false },
+      { id: 'gt-car-north', name: '汽車車棚 (黑色轎車)', fullTitle: '北側教職員汽車車棚（含8根不鏽鋼立柱，停放四輪黑色轎車，靠近按 F 可上車駕駛）', category: 'gate', floor: 1, x: -2, y: 0.3, z: -53, camOffset: [0, 10, 18], walkPos: [-2, -44, Math.PI], zone: '後門東側', isSub: false },
+      { id: 'gt-car-se', name: '汽車車棚 (東南側)', fullTitle: '東南角汽車車棚（含8根不鏽鋼立柱支撐）', category: 'gate', floor: 1, x: 84, y: 0.3, z: 50, camOffset: [-18, 15, 20], walkPos: [75, 50, -Math.PI / 2], zone: '側門東側角落', isSub: false },
+      { id: 'gt-wall', name: '白色矮牆 (校門兩側)', fullTitle: '校門外蝴蝶故事館、採風館與操場側白色磁磚矮牆', category: 'gate', floor: 1, x: 18, y: 1.0, z: 64, camOffset: [0, 8, 16], walkPos: [18, 57, 0], zone: '南側坪頂路沿線', isSub: true }
+    ];
+
+    const ROAD_MARKERS = [
+      { text: '⬅️ 往林內市區｜坪頂路', x: -75, y: 0.5, z: 74 },
+      { text: '坪頂路', x: 10, y: 0.5, z: 74 },
+      { text: '坪頂路｜往坪頂社區 ➡️', x: 80, y: 0.5, z: 74 },
+      { text: '產 業 道 路 ⬆️⬇️', x: 112, y: 0.5, z: 0 }
+    ];
+
+    const state = {
+      mode: 'orbit', walkPov: 'third', showSubLabels: true, hideAllLabels: false,
+      categoryFilter: 'all', searchQuery: '', selectedPoiId: 'eco-pond',
+      timeOfDay: 'day', minimapFloor: 1, minimapCollapsed: false,
+      sidebarOpen: window.innerWidth >= 768, sprint: false, isDriving: false
+    };
+
+    const container = document.getElementById('canvas-container');
+    const labelsContainer = document.getElementById('labels-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xbae6fd);
+    scene.fog = new THREE.FogExp2(0xbae6fd, 0.0015);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.35, 650);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.74);
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x3f6212, 0.44);
+    hemiLight.position.set(0, 120, 0);
+    const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.05);
+    sunLight.position.set(-60, 110, 75);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 10; sunLight.shadow.camera.far = 320;
+    const d = 135;
+    sunLight.shadow.camera.left = -d; sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d; sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(ambientLight, hemiLight, sunLight);
+
+    const groupGround = new THREE.Group(), groupFloor1 = new THREE.Group(), groupFloor2 = new THREE.Group(), groupRoof = new THREE.Group();
+    scene.add(groupGround, groupFloor1, groupFloor2, groupRoof);
+
+    function makeMat(color, opts = {}) {
+      return new THREE.MeshStandardMaterial({
+        color, map: opts.map || null,
+        roughness: opts.roughness !== undefined ? opts.roughness : 0.72,
+        metalness: opts.metalness !== undefined ? opts.metalness : 0.08,
+        transparent: opts.transparent || false,
+        opacity: opts.opacity !== undefined ? opts.opacity : 1.0,
+        side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide
+      });
+    }
+
+    function createTextCanvasTexture(text, bgHex, textHex, width = 256, height = 128, fontSize = 36, subText = '') {
+      const cvs = document.createElement('canvas'); cvs.width = width; cvs.height = height;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = bgHex; ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 6; ctx.strokeRect(4, 4, width - 8, height - 8);
+      ctx.fillStyle = textHex; ctx.font = `900 ${fontSize}px "Noto Sans TC", sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (subText) {
+        ctx.fillText(text, width / 2, height / 2 - 14);
+        ctx.font = `700 ${Math.round(fontSize * 0.58)}px "Noto Sans TC", sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillText(subText, width / 2, height / 2 + 22);
+      } else ctx.fillText(text, width / 2, height / 2);
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createGrayTileTexture(repeatX = 8, repeatY = 2, baseHex = '#7c8590', groutHex = '#4b5563') {
+      const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 128;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = baseHex; ctx.fillRect(0, 0, 256, 128);
+      const shades = ['#737c88', '#7d8692', '#6b7480', '#848d99'];
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+        ctx.fillStyle = shades[(r * 3 + c) % 4]; ctx.fillRect(c * 32 + 1, r * 16 + 1, 30, 14);
+      }
+      ctx.strokeStyle = groutHex; ctx.lineWidth = 2;
+      for (let r = 0; r <= 8; r++) { ctx.beginPath(); ctx.moveTo(0, r * 16); ctx.lineTo(256, r * 16); ctx.stroke(); }
+      for (let c = 0; c <= 8; c++) { ctx.beginPath(); ctx.moveTo(c * 32, 0); ctx.lineTo(c * 32, 128); ctx.stroke(); }
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(repeatX, repeatY);
+      return tex;
+    }
+
+    function createWhiteTiledLowWallTexture(repeatX = 6) {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 128;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 512, 128);
+      ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
+      for (let x = 0; x <= 512; x += 12) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 128); ctx.stroke(); }
+      for (let y = 0; y <= 128; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke(); }
+      ctx.fillStyle = '#64748b'; ctx.fillRect(0, 0, 512, 12);
+      ctx.fillStyle = '#475569'; ctx.fillRect(0, 114, 512, 14);
+      ctx.fillStyle = '#d97706'; ctx.font = 'bold 20px "Inter", "Noto Sans TC", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Chenggong Elementary School  🦋', 256, 62);
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.ClampToEdgeWrapping; tex.repeat.set(repeatX, 1);
+      return tex;
+    }
+
+    function createMainGatePillarTexture(side = 'right') {
+      const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 512;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#b8b2a6'; ctx.fillRect(0, 0, 256, 512);
+      for (let x = 0; x < 256; x += 8) { ctx.fillStyle = x % 16 === 0 ? '#9e978b' : '#c7c1b6'; ctx.fillRect(x, 0, 4, 512); }
+      for (let y = 40; y < 512; y += 52) { ctx.strokeStyle = '#78716c'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke(); }
+      if (side === 'left') {
+        ctx.save(); ctx.beginPath(); ctx.moveTo(0, 40); ctx.bezierCurveTo(60, 180, 140, 310, 256, 470);
+        ctx.lineTo(256, 512); ctx.lineTo(175, 512); ctx.bezierCurveTo(85, 360, 20, 220, 0, 120); ctx.closePath();
+        const grad = ctx.createLinearGradient(0, 40, 256, 500);
+        grad.addColorStop(0, '#be123c'); grad.addColorStop(0.5, '#9333ea'); grad.addColorStop(1, '#e11d48');
+        ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
+        [[48, 175, 18, '#fde047'], [95, 265, 22, '#38bdf8'], [155, 355, 19, '#f472b6'], [205, 425, 22, '#a855f7']].forEach(([cx, cy, r, c]) => {
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        });
+        [[192, 165, '#38bdf8'], [192, 235, '#fb7185']].forEach(([cx, cy, c], idx) => {
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 24, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = c; ctx.lineWidth = 4; ctx.stroke();
+          ctx.fillStyle = '#6b21a8'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(idx === 0 ? '🦋' : '成功', cx, cy);
+        });
+        ctx.fillStyle = '#27272a'; ctx.fillRect(18, 340, 74, 155);
+      } else {
+        ctx.save(); ctx.beginPath(); ctx.moveTo(256, 30); ctx.bezierCurveTo(95, 130, 50, 290, 256, 485);
+        ctx.lineTo(256, 512); ctx.lineTo(180, 512); ctx.bezierCurveTo(-10, 310, 35, 100, 256, 0); ctx.closePath();
+        const grad = ctx.createLinearGradient(60, 0, 220, 512);
+        grad.addColorStop(0, '#e11d48'); grad.addColorStop(0.5, '#7e22ce'); grad.addColorStop(1, '#be123c');
+        ctx.fillStyle = grad; ctx.fill(); ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
+        [[135, 110, 18, '#fde047'], [92, 215, 22, '#38bdf8'], [96, 315, 20, '#a855f7'], [152, 415, 22, '#fb7185']].forEach(([cx, cy, r, c]) => {
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.fillStyle = '#18181b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '900 22px "Noto Sans TC", serif';
+        ['雲', '林', '縣'].forEach((ch, i) => ctx.fillText(ch, 168, 128 + i * 26));
+        ['林', '內', '鄉'].forEach((ch, i) => ctx.fillText(ch, 210, 128 + i * 26));
+        ctx.font = '900 34px "Noto Sans TC", serif';
+        ['成', '功', '國', '民', '小', '學'].forEach((ch, i) => ctx.fillText(ch, 190, 228 + i * 44));
+      }
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createButterflyShirtTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#e9d5ff'; ctx.fillRect(0, 0, 256, 256);
+      ctx.fillStyle = '#c084fc'; ctx.fillRect(0, 0, 256, 18); ctx.fillRect(0, 238, 256, 18);
+      ctx.save(); ctx.translate(128, 128);
+      ctx.fillStyle = '#6b21a8'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, -10); ctx.bezierCurveTo(-55, -75, -95, -20, -45, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -10); ctx.bezierCurveTo(55, -75, 95, -20, 45, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#9333ea';
+      ctx.beginPath(); ctx.moveTo(0, 5); ctx.bezierCurveTo(-65, 15, -55, 75, -8, 45); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 5); ctx.bezierCurveTo(65, 15, 55, 75, 8, 45); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#d8b4fe';
+      [[-38, -22, 10], [38, -22, 10], [-28, 30, 8], [28, 30, 8]].forEach(([bx, by, br]) => { ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill(); });
+      ctx.fillStyle = '#3b0764'; ctx.beginPath(); ctx.ellipse(0, 6, 6, 34, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createClassroomFacadeTexture(roomName, opts = {}) {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#78808a'; ctx.fillRect(0, 0, 512, 256);
+      ctx.strokeStyle = '#525b66'; ctx.lineWidth = 1.5;
+      for (let y = 0; y < 256; y += 10) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke(); }
+      for (let x = 0; x < 512; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke(); }
+      if (opts.isWC) {
+        ctx.fillStyle = '#6d28d9'; ctx.fillRect(0, 175, 512, 81);
+        ctx.fillStyle = '#7c3aed'; ctx.fillRect(150, 48, 210, 208);
+        ctx.fillStyle = '#e2e8f0'; ctx.fillRect(172, 66, 166, 190);
+        return new THREE.CanvasTexture(cvs);
+      }
+      ctx.fillStyle = '#cbd5e1'; ctx.fillRect(34, 52, 92, 202);
+      ctx.fillStyle = '#1e293b'; ctx.fillRect(44, 62, 72, 78); ctx.fillRect(44, 164, 72, 62);
+      [[148, 304], [318, 474]].forEach(([wx1, wx2]) => {
+        const ww = wx2 - wx1;
+        ctx.fillStyle = '#0f172a'; ctx.fillRect(wx1, 54, ww, 108);
+        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 3.5; ctx.strokeRect(wx1, 54, ww, 108);
+      });
+      if (opts.hasRedBanner) { ctx.fillStyle = '#dc2626'; ctx.fillRect(8, 68, 18, 92); ctx.fillRect(130, 68, 14, 92); }
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(148, 166, 96, 18);
+      ctx.fillStyle = '#f8fafc'; ctx.font = 'bold 12px "Noto Sans TC", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(roomName, 196, 175);
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createClassroomBackWallTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#717a84'; ctx.fillRect(0, 0, 512, 256);
+      [[56, 226], [286, 456]].forEach(([wx1, wx2]) => {
+        ctx.fillStyle = '#1e293b'; ctx.fillRect(wx1, 48, wx2 - wx1, 110);
+        ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 3.5; ctx.strokeRect(wx1, 48, wx2 - wx1, 110);
+      });
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createCheckerboardTexture(repeatX = 12, repeatY = 2, c1 = '#88292f', c2 = '#f1f5f9') {
+      const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = c1; ctx.fillRect(0, 0, 32, 32); ctx.fillRect(32, 32, 32, 32);
+      ctx.fillStyle = c2; ctx.fillRect(32, 0, 32, 32); ctx.fillRect(0, 32, 32, 32);
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(repeatX, repeatY);
+      return tex;
+    }
+
+    function createSiyuanUpperHeaderTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 1024; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#b45b4c'; ctx.fillRect(0, 0, 1024, 256);
+      [{ cx: 185, r: 125, ch: '堂' }, { cx: 512, r: 145, ch: '源' }, { cx: 839, r: 125, ch: '思' }].forEach(({ cx, r, ch }) => {
+        ctx.beginPath(); ctx.arc(cx, 236, r, Math.PI, 0, false); ctx.closePath();
+        ctx.fillStyle = '#e2e8f0'; ctx.fill();
+        ctx.fillStyle = '#5c2d16'; ctx.fillRect(cx - 34, 154, 68, 68);
+        ctx.fillStyle = '#fde68a'; ctx.font = '900 48px "Noto Sans TC", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(ch, cx, 188);
+      });
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createSiyuanInnerWallTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 1024; cvs.height = 512;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#e5e7eb'; ctx.fillRect(0, 0, 1024, 512);
+      ctx.fillStyle = '#57534e'; ctx.fillRect(320, 138, 384, 374);
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createKitchenWallTexture(isBack = false) {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#8b261d'; ctx.fillRect(0, 0, 512, 46);
+      ctx.fillStyle = '#f1f5f9'; ctx.fillRect(0, 46, 512, 108);
+      ctx.fillStyle = '#c2593f'; ctx.fillRect(0, 154, 512, 82);
+      ctx.fillStyle = '#eab308'; ctx.fillRect(0, 236, 512, 20);
+      if (isBack) { ctx.fillStyle = '#cbd5e1'; ctx.fillRect(195, 76, 122, 168); }
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createPlaygroundWcMosaicTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#bae6fd'; ctx.fillRect(0, 0, 512, 256);
+      ctx.fillStyle = '#1e293b'; ctx.fillRect(88, 72, 92, 184); ctx.fillRect(332, 72, 92, 184);
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createTasselCanopyTopTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 512;
+      const ctx = cvs.getContext('2d');
+      const colors = ['#ef4444', '#f97316', '#facc15', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7', '#ec4899'];
+      colors.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(i * 64, 0, 64, 512); });
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    function createTasselFringeRowTexture() {
+      const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 128;
+      const ctx = cvs.getContext('2d');
+      const colors = ['#ef4444', '#f97316', '#facc15', '#4ade80', '#38bdf8', '#818cf8', '#c084fc', '#f472b6'];
+      ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, 512, 10);
+      for (let i = 0; i < 64; i++) {
+        ctx.fillStyle = colors[i % 8];
+        const x = i * 8, h = 88 + (i % 3) * 14;
+        ctx.fillRect(x + 1, 10, 6, h);
+        ctx.beginPath(); ctx.arc(x + 4, 10 + h, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      const tex = new THREE.CanvasTexture(cvs); tex.transparent = true;
+      return tex;
+    }
+
+    const sharedBackWallTex = createClassroomBackWallTexture();
+    const sharedParapetGrayTileTex = createGrayTileTexture(18, 2, '#7c8590', '#475569');
+    const sharedPillarGrayTileTex = createGrayTileTexture(2, 6, '#6e7782', '#3f4752');
+    const tasselRows = [];
+
+    function buildCampusScene() {
+      const worldBase = new THREE.Mesh(new THREE.PlaneGeometry(420, 340), makeMat(0x365314, { roughness: 0.95 }));
+      worldBase.rotation.x = -Math.PI / 2; worldBase.position.y = -0.15; worldBase.receiveShadow = true;
+      const campusTurf = new THREE.Mesh(new THREE.PlaneGeometry(212, 134), makeMat(0x4d7c0f, { roughness: 0.9 }));
+      campusTurf.rotation.x = -Math.PI / 2; campusTurf.position.set(0, -0.02, -2); campusTurf.receiveShadow = true;
+      const pingdingRoad = new THREE.Mesh(new THREE.PlaneGeometry(250, 14), makeMat(0x334155, { roughness: 0.85 }));
+      pingdingRoad.rotation.x = -Math.PI / 2; pingdingRoad.position.set(4, 0.01, 73);
+      const eastRoad = new THREE.Mesh(new THREE.PlaneGeometry(12, 165), makeMat(0x334155, { roughness: 0.85 }));
+      eastRoad.rotation.x = -Math.PI / 2; eastRoad.position.set(112, 0.01, -2);
+      const centerLine = new THREE.Mesh(new THREE.PlaneGeometry(240, 0.35), makeMat(0xfacc15));
+      centerLine.rotation.x = -Math.PI / 2; centerLine.position.set(4, 0.03, 73);
+      groupGround.add(worldBase, campusTurf, pingdingRoad, eastRoad, centerLine);
+
+      const brickMat = makeMat(0xb45309, { roughness: 0.82 });
+      const brickAve = new THREE.Mesh(new THREE.PlaneGeometry(13.0, 128), brickMat);
+      brickAve.rotation.x = -Math.PI / 2; brickAve.position.set(-16.0, 0.03, 0); brickAve.receiveShadow = true;
+      const adminBrickPlaza = new THREE.Mesh(new THREE.PlaneGeometry(7.5, 54), brickMat);
+      adminBrickPlaza.rotation.x = -Math.PI / 2; adminBrickPlaza.position.set(17.5, 0.03, 11);
+      const southBrickLink = new THREE.Mesh(new THREE.PlaneGeometry(40, 7.5), brickMat);
+      southBrickLink.rotation.x = -Math.PI / 2; southBrickLink.position.set(0.5, 0.03, 39);
+      groupGround.add(brickAve, adminBrickPlaza, southBrickLink);
+
+      const westFlushWall = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.72, 57.4), makeMat(0xd6d3d1));
+      westFlushWall.position.set(-22.5, 0.36, 34.5);
+      const eastCurbN = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 29.0), makeMat(0xd6d3d1));
+      eastCurbN.position.set(-9.5, 0.28, 20.5);
+      const eastCurbS = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 20.0), makeMat(0xd6d3d1));
+      eastCurbS.position.set(-9.5, 0.28, 53.0);
+      const hedgeBush = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.25, 37.0), makeMat(0x15803d));
+      hedgeBush.position.set(-24.0, 0.62, 28.5);
+      groupFloor1.add(westFlushWall, eastCurbN, eastCurbS, hedgeBush);
+
+      // 兩倍高桃花心木
+      const mahoganyGroup = new THREE.Group(); mahoganyGroup.position.set(-25.2, 0, 52.0);
+      const mTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.45, 16.0, 12), makeMat(0x4a3525));
+      mTrunk.position.y = 8.0; mTrunk.castShadow = true; mahoganyGroup.add(mTrunk);
+      [[0, 17.6, 0, 5.2], [-2.8, 20.8, 1.8, 4.6], [2.8, 21.6, -1.6, 4.5], [0, 25.0, 0.5, 4.8], [-1.6, 27.6, -1.2, 3.9]].forEach(([cx, cy, cz, cr], idx) => {
+        const foliage = new THREE.Mesh(new THREE.DodecahedronGeometry(cr, 1), makeMat(idx % 2 === 0 ? 0x166534 : 0x15803d));
+        foliage.position.set(cx, cy, cz); foliage.castShadow = true; mahoganyGroup.add(foliage);
+      });
+      groupFloor1.add(mahoganyGroup);
+
+      // 操場跑道
+      const trackGroup = new THREE.Group(); trackGroup.position.set(-53.5, 0.04, 16.0);
+      const trackMat = makeMat(0xc2410c), infieldMat = makeMat(0x65a30d), lineWhiteMat = makeMat(0xf8fafc);
+      const straightLen = 23.0, outerR = 15.0, innerR = 9.2;
+      const midTrack = new THREE.Mesh(new THREE.PlaneGeometry(straightLen, outerR * 2), trackMat);
+      midTrack.rotation.x = -Math.PI / 2; trackGroup.add(midTrack);
+      [-straightLen / 2, straightLen / 2].forEach((sx, idx) => {
+        const cap = new THREE.Mesh(new THREE.CircleGeometry(outerR, 36, idx === 0 ? Math.PI / 2 : -Math.PI / 2, Math.PI), trackMat);
+        cap.rotation.x = -Math.PI / 2; cap.position.x = sx;
+        const innerCap = new THREE.Mesh(new THREE.CircleGeometry(innerR, 32, idx === 0 ? Math.PI / 2 : -Math.PI / 2, Math.PI), infieldMat);
+        innerCap.rotation.x = -Math.PI / 2; innerCap.position.set(sx, 0.02, 0);
+        trackGroup.add(cap, innerCap);
+      });
+      const midInfield = new THREE.Mesh(new THREE.PlaneGeometry(straightLen, innerR * 2), infieldMat);
+      midInfield.rotation.x = -Math.PI / 2; midInfield.position.y = 0.02;
+      const sprintExt = new THREE.Mesh(new THREE.PlaneGeometry(56.7, 5.6), trackMat);
+      sprintExt.rotation.x = -Math.PI / 2; sprintExt.position.set(0.65, 0.012, -12.2);
+      trackGroup.add(midInfield, sprintExt);
+      groupGround.add(trackGroup);
+
+      // 4 籃球場 & 紫蝶牆
+      const bballCourt = new THREE.Mesh(new THREE.PlaneGeometry(16.0, 27.0), makeMat(0x991b1b));
+      bballCourt.rotation.x = -Math.PI / 2; bballCourt.position.set(-90.5, 0.04, 27.5);
+      const bballInner = new THREE.Mesh(new THREE.PlaneGeometry(13.2, 22.8), makeMat(0x15803d));
+      bballInner.rotation.x = -Math.PI / 2; bballInner.position.set(-90.5, 0.06, 27.5);
+      groupGround.add(bballCourt, bballInner);
+
+      const butterflyWall = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 3.6, 15),
+        [new THREE.MeshStandardMaterial({ map: createTextCanvasTexture('🦋 紫 蝶 牆', '#ffffff', '#6d28d9', 512, 160, 48) }), makeMat(0xd6d3d1), makeMat(0xd6d3d1), makeMat(0xd6d3d1), makeMat(0xd6d3d1), makeMat(0xd6d3d1)]
+      );
+      butterflyWall.position.set(-99.5, 1.8, 27.5); groupFloor1.add(butterflyWall);
+
+      // 兒童遊戲區（彩色流蘇棚 + 90度旋轉朝東溜滑梯）
+      const playGroup = new THREE.Group(); playGroup.position.set(-89.2, 0, 7.4);
+      const playMatPad = new THREE.Mesh(new THREE.BoxGeometry(14.8, 0.14, 12.8), makeMat(0x16a34a));
+      playMatPad.position.y = 0.07; playGroup.add(playMatPad);
+      const canopyW = 12.8, canopyD = 10.6, canopyH = 4.15;
+      const postMat = makeMat(0xe2e8f0, { metalness: 0.6, roughness: 0.3 });
+      [-canopyW / 2 + 0.5, 0, canopyW / 2 - 0.5].forEach(px => {
+        [-canopyD / 2 + 0.5, canopyD / 2 - 0.5].forEach(pz => {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, canopyH, 12), postMat);
+          post.position.set(px, canopyH / 2, pz); playGroup.add(post);
+        });
+      });
+      const topShade = new THREE.Mesh(new THREE.BoxGeometry(canopyW, 0.14, canopyD), new THREE.MeshStandardMaterial({ map: createTasselCanopyTopTexture(), side: THREE.DoubleSide }));
+      topShade.position.y = canopyH; playGroup.add(topShade);
+
+      const fringeMat = new THREE.MeshBasicMaterial({ map: createTasselFringeRowTexture(), transparent: true, side: THREE.DoubleSide, alphaTest: 0.15 });
+      for (let r = 0; r < 6; r++) {
+        const rz = -canopyD / 2 + 0.8 + r * ((canopyD - 1.6) / 5);
+        const fPlane = new THREE.Mesh(new THREE.PlaneGeometry(canopyW - 0.4, 0.95), fringeMat);
+        fPlane.position.set(0, canopyH - 0.42, rz); playGroup.add(fPlane);
+        tasselRows.push({ mesh: fPlane, phase: r * 0.8, axis: 'x' });
+      }
+
+      const slidePlayset = new THREE.Group();
+      slidePlayset.position.set(-0.6, 0.14, 0); slidePlayset.rotation.y = Math.PI / 2;
+      [-1.85, 1.85].forEach((tx, idx) => {
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(2.1, 2.15, 2.1), makeMat(0xf59e0b)); tower.position.set(tx, 1.08, -0.8);
+        const coneRoof = new THREE.Mesh(new THREE.ConeGeometry(1.75, 1.15, 4), makeMat(0xdc2626)); coneRoof.position.set(tx, 2.72, -0.8); coneRoof.rotation.y = Math.PI / 4;
+        const chute = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.22, 3.2), makeMat(idx === 0 ? 0xfacc15 : 0xef4444));
+        chute.position.set(tx, 0.88, 1.55); chute.rotation.x = 0.42;
+        slidePlayset.add(tower, coneRoof, chute);
+      });
+      const bridgeDeck = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 1.3), makeMat(0x2563eb)); bridgeDeck.position.set(0, 1.35, -0.8);
+      slidePlayset.add(bridgeDeck); playGroup.add(slidePlayset); groupFloor1.add(playGroup);
+
+      // 3 廁所 & 2 司令台
+      const westWcGroup = new THREE.Group(); westWcGroup.position.set(-76.5, 0, -5.0); westWcGroup.rotation.y = -0.14;
+      const westWcBody = new THREE.Mesh(new THREE.BoxGeometry(6.2, 3.5, 11.0), makeMat(0xdbeafe, { map: createPlaygroundWcMosaicTexture() }));
+      westWcBody.position.y = 1.75; westWcGroup.add(westWcBody); groupFloor1.add(westWcGroup);
+
+      const stageGroup = new THREE.Group(); stageGroup.position.set(-53.5, 0, -2.2);
+      const stageBase = new THREE.Mesh(new THREE.BoxGeometry(7.6, 1.12, 5.8), makeMat(0xd97742)); stageBase.position.y = 0.56;
+      const flagpole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 9.2, 12), makeMat(0xf8fafc, { metalness: 0.8 })); flagpole.position.set(0, 6.0, 0);
+      stageGroup.add(stageBase, flagpole); groupFloor1.add(stageGroup);
+
+      buildSiyuanHall(-35.5, -12.5, 11.6, 26.0, 5.4);
+      buildKitchenAndRearScooterShed();
+
+      // 北側汽車車棚（含8根不鏽鋼立柱）+ 黑色四輪轎車 + 東南側車棚 + 晴天球場（含10根藍色鋼柱）
+      buildCarport(-2, -53, 21, 11, 0x7f1d1d, 0);
+      buildDrivableCarInNorthGarage();
+      buildCarport(84, 50, 18, 10, 0x57534e, -0.55);
+      buildDormitory(28, -53.5, 24, 13);
+      buildSunnyBasketballCourt(68, -54, 32, 20);
+
+      buildMainGrayTeachingAndAdminBuildings();
+      buildConfuciusStatueInFrontOfHealthCenter();
+      buildGardensAndEcology();
+
+      buildStandaloneBuilding({ x: 6, z: 55, w: 17, d: 12, h: 4.2, wallColor: 0x94a3b8, roofColor: 0x15803d, label: '蝴蝶故事館' });
+      buildStandaloneBuilding({ x: 26, z: 55, w: 17, d: 12, h: 4.2, wallColor: 0x94a3b8, roofColor: 0x475569, label: '坪頂採風館' });
+      buildGatesAndPerimeterWalls();
+      buildCampusTrees();
+    }
+
+    function buildSiyuanHall(x, z, w, d, h) {
+      const g = new THREE.Group(); g.position.set(x, 0, z);
+      const porchDepth = 3.0, mainD = d - porchDepth, lowerH = 3.6, upperH = h - lowerH;
+      const terracottaMat = makeMat(0xb45b4c), whiteTileMat = makeMat(0xe2e8f0);
+      const innerFrontMat = makeMat(0xffffff, { map: createSiyuanInnerWallTexture() });
+      const upperHeaderMat = makeMat(0xffffff, { map: createSiyuanUpperHeaderTexture() });
+      const checkerMat = makeMat(0xffffff, { map: createCheckerboardTexture(2, 5, '#7f1d1d', '#f8fafc') });
+      const mainBody = new THREE.Mesh(new THREE.BoxGeometry(w, lowerH, mainD), [terracottaMat, terracottaMat, terracottaMat, terracottaMat, innerFrontMat, whiteTileMat]);
+      mainBody.position.set(0, lowerH / 2 + 0.18, -porchDepth / 2); g.add(mainBody);
+      [-w / 2 + 0.5, w / 2 - 0.5].forEach(px => {
+        const colLower = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.55, 1.0), checkerMat); colLower.position.set(px, 0.95, d / 2 - 0.5);
+        const colUpper = new THREE.Mesh(new THREE.BoxGeometry(1.0, lowerH - 1.55, 1.0), terracottaMat); colUpper.position.set(px, 2.75, d / 2 - 0.5);
+        g.add(colLower, colUpper);
+      });
+      const upperFascia = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, upperH + 0.35, d), [terracottaMat, terracottaMat, terracottaMat, terracottaMat, upperHeaderMat, terracottaMat]);
+      upperFascia.position.set(0, lowerH + 0.18 + (upperH + 0.35) / 2, 0); g.add(upperFascia);
+      groupFloor1.add(g);
+    }
+
+    // 廚房與後方機車車棚（含 6 根清晰立柱與承重橫樑）
+    function buildKitchenAndRearScooterShed() {
+      const sideMat = makeMat(0xffffff, { map: createKitchenWallTexture(false) });
+      const backMat = makeMat(0xffffff, { map: createKitchenWallTexture(true) });
+      const topMat = makeMat(0x8b261d);
+      const kitchenBody = new THREE.Mesh(new THREE.BoxGeometry(7.2, 4.5, 26.0), [sideMat, sideMat, topMat, topMat, sideMat, backMat]);
+      kitchenBody.position.set(-25.8, 2.25, -12.5); groupFloor1.add(kitchenBody);
+
+      const shedGroup = new THREE.Group(); shedGroup.position.set(-25.8, 0, -29.5);
+      const shedW = 7.6, shedD = 5.2, shedH = 3.1;
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(shedW, 0.14, shedD), makeMat(0x64748b)); pad.position.y = 0.07; shedGroup.add(pad);
+      const postMat = makeMat(0xf1f5f9, { metalness: 0.7, roughness: 0.2 });
+      const plinthMat = makeMat(0x475569);
+      [-shedW / 2 + 0.4, 0, shedW / 2 - 0.4].forEach(px => {
+        [-shedD / 2 + 0.4, shedD / 2 - 0.4].forEach(pz => {
+          const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.4, 0.42), plinthMat); plinth.position.set(px, 0.2, pz);
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, shedH, 12), postMat); post.position.set(px, shedH / 2, pz); post.castShadow = true;
+          shedGroup.add(plinth, post);
+        });
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, shedD), postMat); beam.position.set(px, shedH - 0.1, 0); shedGroup.add(beam);
+      });
+      const greenRoof = new THREE.Mesh(new THREE.BoxGeometry(shedW + 0.5, 0.24, shedD + 0.5), makeMat(0x15803d));
+      greenRoof.position.y = shedH + 0.08; greenRoof.rotation.x = -0.06; shedGroup.add(greenRoof);
+      groupFloor1.add(shedGroup);
+    }
+
+    function buildStandaloneBuilding({ x, z, w, d, h, wallColor, roofColor, label }) {
+      const sideMat = makeMat(wallColor, { map: sharedPillarGrayTileTex });
+      const frontMat = makeMat(0xffffff, { map: createClassroomFacadeTexture(label, {}) });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [sideMat, sideMat, sideMat, sideMat, frontMat, sideMat]);
+      body.position.set(x, h / 2, z); body.castShadow = true; groupFloor1.add(body);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.45, d + 0.8), makeMat(roofColor));
+      roof.position.set(x, h + 0.22, z); groupRoof.add(roof);
+    }
+
+    // 汽車車棚（含 8 根高對比不鏽鋼粗立柱、混凝土柱礎與縱橫承重鋼樑）
+    function buildCarport(x, z, w, d, roofHex, rotY = 0) {
+      const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY;
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, d), makeMat(0x64748b));
+      pad.position.y = 0.07; pad.receiveShadow = true; g.add(pad);
+
+      const lineMat = makeMat(0xf8fafc);
+      for (let i = -2; i <= 2; i++) {
+        const pLine = new THREE.Mesh(new THREE.PlaneGeometry(0.14, d - 1.6), lineMat);
+        pLine.rotation.x = -Math.PI / 2; pLine.position.set(i * (w / 5), 0.15, 0); g.add(pLine);
+      }
+
+      const postH = 3.4;
+      const postMat = makeMat(0xf8fafc, { metalness: 0.72, roughness: 0.22 });
+      const baseMat = makeMat(0x334155);
+      const colsX = [-w / 2 + 0.7, -w / 6, w / 6, w / 2 - 0.7];
+      const colsZ = [-d / 2 + 0.7, d / 2 - 0.7];
+
+      colsX.forEach(px => {
+        colsZ.forEach(pz => {
+          const baseBlock = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.48, 0.52), baseMat);
+          baseBlock.position.set(px, 0.24, pz); baseBlock.castShadow = true;
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.20, postH, 14), postMat);
+          post.position.set(px, postH / 2, pz); post.castShadow = true;
+          g.add(baseBlock, post);
+        });
+        const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, d - 0.5), postMat);
+        crossBeam.position.set(px, postH - 0.12, 0); g.add(crossBeam);
+      });
+
+      colsZ.forEach(pz => {
+        const longBeam = new THREE.Mesh(new THREE.BoxGeometry(w - 0.5, 0.26, 0.26), postMat);
+        longBeam.position.set(0, postH - 0.12, pz); g.add(longBeam);
+      });
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.28, d + 0.6), makeMat(roofHex, { metalness: 0.3 }));
+      roof.position.y = postH + 0.12; roof.rotation.x = 0.06; roof.castShadow = true;
+      g.add(roof);
+      groupFloor1.add(g);
+    }
+
+    // 北側車庫內可駕駛的「黑色四輪轎車」（亮面黑色車身 + 4顆獨立外露立體輪胎、銀色鋁圈與輪軸）
+    const drivableCar = { group: new THREE.Group(), wheels: [], x: -2.0, y: 0.08, z: -51.8, rotY: 0, speed: 0 };
+
+    function buildDrivableCarInNorthGarage() {
+      const g = drivableCar.group;
+      g.position.set(drivableCar.x, drivableCar.y, drivableCar.z);
+      g.rotation.y = drivableCar.rotY;
+      drivableCar.wheels.length = 0;
+
+      const blackBodyMat = makeMat(0x111827, { metalness: 0.72, roughness: 0.2 });
+      const blackTrimMat = makeMat(0x1f2937, { metalness: 0.4, roughness: 0.4 });
+      const glassMat = makeMat(0x38bdf8, { metalness: 0.85, roughness: 0.12, transparent: true, opacity: 0.72 });
+      const chromeMat = makeMat(0xf1f5f9, { metalness: 0.85, roughness: 0.15 });
+
+      // 抬高車身底盤高度至 y = 0.78，讓下方四顆大車輪完整露出不被遮擋
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.64, 4.4), blackBodyMat);
+      chassis.position.y = 0.78; chassis.castShadow = true; g.add(chassis);
+
+      const frontBumper = new THREE.Mesh(new THREE.BoxGeometry(2.08, 0.22, 0.35), blackTrimMat); frontBumper.position.set(0, 0.56, -2.12);
+      const rearBumper = frontBumper.clone(); rearBumper.position.set(0, 0.56, 2.12);
+      const grille = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.26, 0.08), chromeMat); grille.position.set(0, 0.76, -2.21);
+      g.add(frontBumper, rearBumper, grille);
+
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.76, 0.62, 2.25), blackBodyMat);
+      cabin.position.set(0, 1.38, -0.1); cabin.castShadow = true;
+      const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.54, 2.32), glassMat); windshield.position.set(0, 1.37, -0.1);
+      const sideWindows = new THREE.Mesh(new THREE.BoxGeometry(1.80, 0.48, 1.95), glassMat); sideWindows.position.set(0, 1.38, -0.1);
+      g.add(cabin, windshield, sideWindows);
+
+      [-0.74, 0.74].forEach(lx => {
+        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.18, 0.1), new THREE.MeshBasicMaterial({ color: 0xfef08a })); hl.position.set(lx, 0.84, -2.21);
+        const tl = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.1), new THREE.MeshBasicMaterial({ color: 0xef4444 })); tl.position.set(lx, 0.86, 2.21);
+        g.add(hl, tl);
+      });
+
+      const tireMat = makeMat(0x090d16, { roughness: 0.88, metalness: 0.1 });
+      const rimMat = makeMat(0xf8fafc, { metalness: 0.85, roughness: 0.15 });
+      const spokeMat = makeMat(0xcbd5e1, { metalness: 0.75, roughness: 0.25 });
+
+      [-1.38, 1.38].forEach(wz => {
+        const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.26, 12), spokeMat);
+        axle.rotation.z = Math.PI / 2; axle.position.set(0, 0.45, wz); g.add(axle);
+      });
+
+      [[-1.12, -1.38], [1.12, -1.38], [-1.12, 1.38], [1.12, 1.38]].forEach(([wx, wz]) => {
+        const wheelGroup = new THREE.Group();
+        wheelGroup.position.set(wx, 0.45, wz);
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.36, 24), tireMat);
+        tire.rotation.z = Math.PI / 2; tire.castShadow = true;
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.38, 16), rimMat);
+        rim.rotation.z = Math.PI / 2;
+        const spoke1 = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.52, 0.08), spokeMat);
+        const spoke2 = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.08, 0.52), spokeMat);
+        wheelGroup.add(tire, rim, spoke1, spoke2);
+        g.add(wheelGroup);
+        drivableCar.wheels.push(wheelGroup);
+      });
+
+      scene.add(g);
+    }
+
+    function buildDormitory(x, z, w, d) {
+      const h1 = 3.8, h2 = 3.8;
+      const sideMat = makeMat(0x7c8590, { map: sharedPillarGrayTileTex });
+      const f1Box = new THREE.Mesh(new THREE.BoxGeometry(w, h1, d), [sideMat, sideMat, sideMat, sideMat, makeMat(0xffffff, { map: createClassroomFacadeTexture('宿舍一樓', {}) }), sideMat]);
+      f1Box.position.set(x, h1 / 2, z); groupFloor1.add(f1Box);
+      const f2Box = new THREE.Mesh(new THREE.BoxGeometry(w, h2, d), [sideMat, sideMat, sideMat, sideMat, makeMat(0xffffff, { map: createClassroomFacadeTexture('宿舍二樓', {}) }), sideMat]);
+      f2Box.position.set(x, h1 + h2 / 2, z); groupFloor2.add(f2Box);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.4, d + 0.8), makeMat(0x475569));
+      roof.position.set(x, h1 + h2 + 0.2, z); groupRoof.add(roof);
+    }
+
+    // 晴天球場（含 10 根天藍色大型鋼構立柱、混凝土柱礎、屋頂橫樑、西側藍色擋牆、南北黃色護網與兩座籃球架）
+    function buildSunnyBasketballCourt(x, z, w, d) {
+      const g = new THREE.Group(); g.position.set(x, 0, z);
+      const courtBase = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), makeMat(0x15803d));
+      courtBase.position.y = 0.06; courtBase.receiveShadow = true; g.add(courtBase);
+
+      const courtInner = new THREE.Mesh(
+        new THREE.PlaneGeometry(w - 4, d - 4),
+        new THREE.MeshBasicMaterial({ map: createTextCanvasTexture('晴 天 球 場', '#166534', '#ffffff', 512, 256, 44, '風雨籃球場') })
+      );
+      courtInner.rotation.x = -Math.PI / 2; courtInner.position.y = 0.13; g.add(courtInner);
+
+      const blueMat = makeMat(0x0284c7, { roughness: 0.4, metalness: 0.2 });
+      const plinthMat = makeMat(0xe2e8f0, { roughness: 0.6 });
+      const yellowFenceMat = makeMat(0xeab308, { transparent: true, opacity: 0.48, doubleSide: true });
+
+      const blueLowWall = new THREE.Mesh(new THREE.BoxGeometry(0.55, 2.5, d), blueMat);
+      blueLowWall.position.set(-w / 2 + 0.5, 1.25, 0); blueLowWall.castShadow = true; g.add(blueLowWall);
+
+      const colH = 7.9;
+      const colsX = [-w / 2 + 0.6, -w / 4, 0, w / 4, w / 2 - 0.6];
+      const colsZ = [-d / 2 + 0.6, d / 2 - 0.6];
+
+      colsX.forEach(cx => {
+        colsZ.forEach(cz => {
+          const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.65, 1.3), plinthMat);
+          plinth.position.set(cx, 0.325, cz); plinth.castShadow = true;
+          const col = new THREE.Mesh(new THREE.BoxGeometry(0.98, colH, 0.98), blueMat);
+          col.position.set(cx, colH / 2, cz); col.castShadow = true; col.receiveShadow = true;
+          g.add(plinth, col);
+        });
+        const trussBeam = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, d), blueMat);
+        trussBeam.position.set(cx, colH - 0.25, 0); g.add(trussBeam);
+      });
+
+      colsZ.forEach(cz => {
+        const sideBeam = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, 0.5), blueMat);
+        sideBeam.position.set(0, colH - 0.25, cz); g.add(sideBeam);
+      });
+
+      const fenceN = new THREE.Mesh(new THREE.BoxGeometry(w - 1.2, 2.4, 0.16), yellowFenceMat); fenceN.position.set(0, 1.2, -d / 2 + 0.6);
+      const fenceS = fenceN.clone(); fenceS.position.set(0, 1.2, d / 2 - 0.6);
+      g.add(fenceN, fenceS);
+
+      [-w / 2 + 2.4, w / 2 - 2.4].forEach((hx, idx) => {
+        const hoop = new THREE.Group(); hoop.position.set(hx, 0, 0);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 3.4, 12), makeMat(0xe2e8f0, { metalness: 0.6 })); pole.position.y = 1.7;
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 1.8), makeMat(0xffffff)); board.position.set(idx === 0 ? 0.55 : -0.55, 3.1, 0);
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.04, 8, 16), makeMat(0xea580c)); rim.rotation.x = Math.PI / 2; rim.position.set(idx === 0 ? 0.9 : -0.9, 2.8, 0);
+        hoop.add(pole, board, rim); g.add(hoop);
+      });
+
+      groupFloor1.add(g);
+
+      const roofCanopy = new THREE.Mesh(new THREE.BoxGeometry(w + 2.5, 0.42, d + 2.5), makeMat(0x94a3b8, { metalness: 0.4 }));
+      roofCanopy.position.set(x, 8.1, z); roofCanopy.rotation.x = 0.08; roofCanopy.castShadow = true;
+      groupRoof.add(roofCanopy);
+    }
+
+    function buildConfuciusStatueInFrontOfHealthCenter() {
+      const g = new THREE.Group(); g.position.set(59.5, 0, -10.8);
+      const whiteBase = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.42, 2.8), makeMat(0xf8fafc)); whiteBase.position.y = 0.21;
+      const pedTex = createTextCanvasTexture('至聖先師', '#7c2d12', '#fde047', 128, 256, 28);
+      const pedestal = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.75, 1.15), new THREE.MeshStandardMaterial({ map: pedTex })); pedestal.position.y = 1.28;
+      const bronzeMat = makeMat(0x27272a, { metalness: 0.65, roughness: 0.35 });
+      const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.44, 1.45, 14), bronzeMat); robe.position.y = 2.85;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 14), bronzeMat); head.position.y = 3.72;
+      g.add(whiteBase, pedestal, robe, head);
+      [-2.3, 2.3].forEach(jx => {
+        const jCrown = new THREE.Mesh(new THREE.ConeGeometry(0.72, 3.8, 12), makeMat(0x14532d));
+        jCrown.position.set(jx, 2.2, -0.2); g.add(jCrown);
+      });
+      groupFloor1.add(g);
+    }
+
+    function buildMainGrayTeachingAndAdminBuildings() {
+      const f1BaseY = 0.28, roomH = 3.92, f2BaseY = 4.48;
+      const terrazzoMat = makeMat(0x64748b, { roughness: 0.65 });
+      const parapetTileMat = makeMat(0x88919b, { map: sharedParapetGrayTileTex });
+      const pillarTileMat = makeMat(0x737c86, { map: sharedPillarGrayTileTex });
+      const purpleGuardMat = makeMat(0xa855f7);
+
+      const hBase1F = new THREE.Mesh(new THREE.BoxGeometry(108, f1BaseY, 18.8), terrazzoMat);
+      hBase1F.position.set(39, f1BaseY / 2, -22.8); groupFloor1.add(hBase1F);
+
+      const hSlab2FWest = new THREE.Mesh(new THREE.BoxGeometry(56.6, 0.28, 18.8), terrazzoMat); hSlab2FWest.position.set(13.3, f2BaseY - 0.14, -22.8);
+      const hSlab2FEast = new THREE.Mesh(new THREE.BoxGeometry(46.5, 0.28, 18.8), terrazzoMat); hSlab2FEast.position.set(69.75, f2BaseY - 0.14, -22.8);
+      const hSlab2FLanding = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.28, 6.2), terrazzoMat); hSlab2FLanding.position.set(44.2, f2BaseY - 0.14, -29.1);
+      const hSlab2FBridge = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.28, 3.7), terrazzoMat); hSlab2FBridge.position.set(44.2, f2BaseY - 0.14, -15.35);
+      groupFloor2.add(hSlab2FWest, hSlab2FEast, hSlab2FLanding, hSlab2FBridge);
+
+      const vBase1F = new THREE.Mesh(new THREE.BoxGeometry(20.2, f1BaseY, 49.3), terrazzoMat);
+      vBase1F.position.set(31.1, f1BaseY / 2, 11.15); groupFloor1.add(vBase1F);
+
+      const vSlab2FCorridor = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.28, 49.3), terrazzoMat); vSlab2FCorridor.position.set(23.0, f2BaseY - 0.14, 11.15);
+      const vSlab2FRooms = new THREE.Mesh(new THREE.BoxGeometry(16.2, 0.28, 41.0), terrazzoMat); vSlab2FRooms.position.set(33.1, f2BaseY - 0.14, 15.3);
+      const vSlab2FStairBack = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.28, 8.3), terrazzoMat); vSlab2FStairBack.position.set(37.5, f2BaseY - 0.14, -9.35);
+      groupFloor2.add(vSlab2FCorridor, vSlab2FRooms, vSlab2FStairBack);
+
+      const teachingRooms1F = [
+        { name: '一年甲班', x1: -14.5, x2: -3.5, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '備課室', x1: -3.5, x2: 1.8, z1: -24.5, z2: -17.2, isWC: false },
+        { name: '廁所 W.C.', x1: -3.5, x2: 1.8, z1: -32.0, z2: -24.5, isWC: true },
+        { name: '備課室', x1: 1.8, x2: 7.2, z1: -24.5, z2: -17.2, isWC: false },
+        { name: '廁所 W.C.', x1: 1.8, x2: 7.2, z1: -32.0, z2: -24.5, isWC: true },
+        { name: '二年甲班', x1: 7.2, x2: 19.2, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '三年甲班', x1: 19.2, x2: 30.8, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '廁所 W.C.', x1: 30.8, x2: 38.2, z1: -32.0, z2: -17.2, isWC: true },
+        { name: '廁所 W.C.', x1: 46.8, x2: 53.5, z1: -32.0, z2: -17.2, isWC: true },
+        { name: '健康中心', x1: 53.5, x2: 66.2, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '輔導室/研究室', x1: 66.2, x2: 79.5, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '桌球室', x1: 79.5, x2: 92.5, z1: -32.0, z2: -17.2, isWC: false }
+      ];
+      const teachingRooms2F = [
+        { name: '四年甲班', x1: -14.5, x2: -3.5, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '備課室', x1: -3.5, x2: 1.8, z1: -24.5, z2: -17.2, isWC: false },
+        { name: '盥洗室', x1: -3.5, x2: 1.8, z1: -32.0, z2: -24.5, isWC: true },
+        { name: '備課室', x1: 1.8, x2: 7.2, z1: -24.5, z2: -17.2, isWC: false },
+        { name: '廁所 W.C.', x1: 1.8, x2: 7.2, z1: -32.0, z2: -24.5, isWC: true },
+        { name: '五年甲班', x1: 7.2, x2: 19.2, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '六年甲班', x1: 19.2, x2: 30.8, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '廁所 W.C.', x1: 30.8, x2: 38.2, z1: -32.0, z2: -17.2, isWC: true },
+        { name: '自然教室', x1: 53.5, x2: 66.2, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '茶道教室', x1: 66.2, x2: 79.5, z1: -32.0, z2: -17.2, isWC: false },
+        { name: '英語教室', x1: 79.5, x2: 92.5, z1: -32.0, z2: -17.2, isWC: false }
+      ];
+      const adminRooms1F = [
+        { name: '辦公室', x1: 25.0, x2: 41.0, z1: -5.2, z2: 8.5, isWC: false, hasRedBanner: true },
+        { name: '電腦教室', x1: 25.0, x2: 41.0, z1: 8.5, z2: 22.2, isWC: false, hasRedBanner: true },
+        { name: '校長室', x1: 25.0, x2: 41.0, z1: 22.2, z2: 35.5, isWC: false, hasRedBanner: true }
+      ];
+      const adminRooms2F = [
+        { name: '圖書館', x1: 25.0, x2: 41.0, z1: -5.2, z2: 17.5, isWC: false },
+        { name: '音樂教室', x1: 25.0, x2: 41.0, z1: 17.5, z2: 35.5, isWC: false }
+      ];
+
+      teachingRooms1F.forEach(r => buildClosedClassroomUnit(r, f1BaseY, roomH, groupFloor1, 'south'));
+      teachingRooms2F.forEach(r => buildClosedClassroomUnit(r, f2BaseY, roomH, groupFloor2, 'south'));
+      adminRooms1F.forEach(r => buildClosedClassroomUnit(r, f1BaseY, roomH, groupFloor1, 'west'));
+      adminRooms2F.forEach(r => buildClosedClassroomUnit(r, f2BaseY, roomH, groupFloor2, 'west'));
+
+      buildHealthCenterStaircase(41.6, 46.8, -26.0, -17.2, f1BaseY, f2BaseY);
+      buildOfficeSideStaircaseAndRamp(25.0, 33.8, -12.5, -5.3, f1BaseY, f2BaseY);
+
+      [-14.2, -3.5, 7.2, 19.2, 30.8, 38.2, 46.8, 53.5, 66.2, 79.5, 92.2].forEach(px => {
+        const col1 = new THREE.Mesh(new THREE.BoxGeometry(0.65, roomH, 0.65), pillarTileMat); col1.position.set(px, f1BaseY + roomH / 2, -13.75);
+        const guard1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.7), purpleGuardMat); guard1.position.set(px, f1BaseY + 0.65, -13.75);
+        const col2 = new THREE.Mesh(new THREE.BoxGeometry(0.65, roomH, 0.65), pillarTileMat); col2.position.set(px, f2BaseY + roomH / 2, -13.75);
+        groupFloor1.add(col1, guard1); groupFloor2.add(col2);
+      });
+
+      const addParapet = (cx, cz, pw, pd) => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(pw, 1.34, pd), parapetTileMat);
+        wall.position.set(cx, f2BaseY + 0.67, cz); groupFloor2.add(wall);
+      };
+      addParapet(3.225, -13.7, 36.05, 0.45); addParapet(58.8, -13.7, 68.0, 0.45);
+      addParapet(-14.75, -22.75, 0.45, 18.5); addParapet(92.75, -22.75, 0.45, 18.5);
+      addParapet(21.25, 11.025, 0.45, 49.45); addParapet(31.025, 35.65, 19.95, 0.45);
+
+      [-13.2, -5.2, 8.5, 22.2, 35.4].forEach(pz => {
+        const col1 = new THREE.Mesh(new THREE.BoxGeometry(0.65, roomH, 0.65), pillarTileMat); col1.position.set(21.25, f1BaseY + roomH / 2, pz);
+        const col2 = new THREE.Mesh(new THREE.BoxGeometry(0.65, roomH, 0.65), pillarTileMat); col2.position.set(21.25, f2BaseY + roomH / 2, pz);
+        groupFloor1.add(col1); groupFloor2.add(col2);
+      });
+
+      const roofY = f2BaseY + roomH;
+      const hRoofSlab = new THREE.Mesh(new THREE.BoxGeometry(108.8, 0.55, 19.4), parapetTileMat); hRoofSlab.position.set(39, roofY + 0.25, -22.8);
+      const vRoofSlab = new THREE.Mesh(new THREE.BoxGeometry(20.8, 0.55, 49.8), parapetTileMat); vRoofSlab.position.set(31.1, roofY + 0.25, 11.15);
+      const solarMat = makeMat(0x1e293b, { metalness: 0.6, roughness: 0.28 });
+      const hSolar = new THREE.Mesh(new THREE.BoxGeometry(96, 0.2, 16), solarMat); hSolar.position.set(40, roofY + 2.2, -23.0); hSolar.rotation.x = 0.08;
+      const vSolar = new THREE.Mesh(new THREE.BoxGeometry(16, 0.2, 45), solarMat); vSolar.position.set(31.5, roofY + 2.2, 11.5); vSolar.rotation.z = -0.08;
+      groupRoof.add(hRoofSlab, vRoofSlab, hSolar, vSolar);
+    }
+
+    function buildClosedClassroomUnit(r, baseY, roomH, targetGroup, corridorSide) {
+      const w = r.x2 - r.x1, d = r.z2 - r.z1, cx = (r.x1 + r.x2) / 2, cz = (r.z1 + r.z2) / 2;
+      const facadeMat = makeMat(0xffffff, { map: createClassroomFacadeTexture(r.name, { isWC: r.isWC, hasRedBanner: r.hasRedBanner }) });
+      const backMat = makeMat(0xffffff, { map: sharedBackWallTex });
+      const sideGrayMat = makeMat(0x737c86, { map: sharedPillarGrayTileTex });
+      const topGrayMat = makeMat(0x525b66);
+      const materials = corridorSide === 'south'
+        ? [sideGrayMat, sideGrayMat, topGrayMat, topGrayMat, facadeMat, backMat]
+        : [backMat, facadeMat, topGrayMat, topGrayMat, sideGrayMat, sideGrayMat];
+      const box = new THREE.Mesh(new THREE.BoxGeometry(w - 0.18, roomH, d - 0.18), materials);
+      box.position.set(cx, baseY + roomH / 2, cz); box.castShadow = true; box.receiveShadow = true;
+      targetGroup.add(box);
+    }
+
+    function buildHealthCenterStaircase(x1, x2, z1, z2, y1, y2) {
+      const w = x2 - x1, midX = (x1 + x2) / 2, halfW = (w - 0.16) / 2, leftCx = x1 + halfW / 2, rightCx = x2 - halfW / 2;
+      const midY = (y1 + y2) / 2, halfH = midY - y1, landingD = 3.2, zLandingFront = z1 + landingD, flightD = z2 - zLandingFront;
+      const numSteps = 7, stepH = halfH / numSteps, stepD = flightD / numSteps;
+      const stepTreadMat = makeMat(0x94a3b8), stairSideGrayMat = makeMat(0x6e7782, { map: sharedPillarGrayTileTex });
+      const phraseColors = ['#a855f7', '#f472b6', '#facc15', '#38bdf8', '#eab308', '#ec4899'];
+      for (let i = 0; i < numSteps; i++) {
+        const riserMat = new THREE.MeshBasicMaterial({ color: phraseColors[i % 6] });
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(halfW - 0.12, stepH, stepD + 0.04), [stepTreadMat, stepTreadMat, stepTreadMat, stepTreadMat, riserMat, stepTreadMat]);
+        stepMesh.position.set(leftCx, y1 + (i + 0.5) * stepH, z2 - (i + 0.5) * stepD); groupFloor1.add(stepMesh);
+      }
+      const landingBox = new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, halfH, landingD), stairSideGrayMat);
+      landingBox.position.set(midX, y1 + halfH / 2, z1 + landingD / 2); groupFloor1.add(landingBox);
+      for (let i = 0; i < numSteps; i++) {
+        const riserMat = new THREE.MeshBasicMaterial({ color: phraseColors[(i + 3) % 6] });
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(halfW - 0.12, stepH, stepD + 0.04), [stepTreadMat, stepTreadMat, stepTreadMat, stepTreadMat, stepTreadMat, riserMat]);
+        stepMesh.position.set(rightCx, midY + (i + 0.5) * stepH, zLandingFront + (i + 0.5) * stepD); groupFloor1.add(stepMesh);
+      }
+      const backSupportBox = new THREE.Mesh(new THREE.BoxGeometry(w - 0.15, y2 - y1, z1 - (-32.0)), stairSideGrayMat);
+      backSupportBox.position.set(midX, y1 + (y2 - y1) / 2, (-32.0 + z1) / 2); groupFloor1.add(backSupportBox);
+    }
+
+    function buildOfficeSideStaircaseAndRamp(x1, x2, z1, z2, y1, y2) {
+      const totalZ = z2 - z1, midZ = (z1 + z2) / 2, halfZ = (totalZ - 0.16) / 2, rightCz = z2 - halfZ / 2, leftCz = z1 + halfZ / 2;
+      const midY = (y1 + y2) / 2, halfH = midY - y1, landingW = 3.2, xLandingFront = x2 - landingW, flightW = xLandingFront - x1;
+      const numSteps = 7, stepH = halfH / numSteps, stepW = flightW / numSteps;
+      const stepTreadMat = makeMat(0x94a3b8), stairSideGrayMat = makeMat(0x6e7782, { map: sharedPillarGrayTileTex });
+      const phraseColors = ['#38bdf8', '#a3e635', '#c084fc', '#facc15', '#fb7185', '#4ade80'];
+      for (let i = 0; i < numSteps; i++) {
+        const riserMat = new THREE.MeshBasicMaterial({ color: phraseColors[i % 6] });
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(stepW + 0.04, stepH, halfZ - 0.12), [stepTreadMat, riserMat, stepTreadMat, stepTreadMat, stepTreadMat, stepTreadMat]);
+        stepMesh.position.set(x1 + (i + 0.5) * stepW, y1 + (i + 0.5) * stepH, rightCz); groupFloor1.add(stepMesh);
+      }
+      const landingBox = new THREE.Mesh(new THREE.BoxGeometry(landingW, halfH, totalZ - 0.08), stairSideGrayMat);
+      landingBox.position.set(xLandingFront + landingW / 2, y1 + halfH / 2, midZ); groupFloor1.add(landingBox);
+      for (let i = 0; i < numSteps; i++) {
+        const riserMat = new THREE.MeshBasicMaterial({ color: phraseColors[(i + 3) % 6] });
+        const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(stepW + 0.04, stepH, halfZ - 0.12), [riserMat, stepTreadMat, stepTreadMat, stepTreadMat, stepTreadMat, stepTreadMat]);
+        stepMesh.position.set(xLandingFront - (i + 0.5) * stepW, midY + (i + 0.5) * stepH, leftCz); groupFloor1.add(stepMesh);
+      }
+    }
+
+    // 還原原本精細的「中庭花園」與「自然疊石生態池」外觀設計
+    function buildGardensAndEcology() {
+      const courtyardLawn = new THREE.Mesh(new THREE.BoxGeometry(22.4, 0.16, 47.8), makeMat(0x65a30d, { roughness: 0.85 }));
+      courtyardLawn.position.set(2.4, 0.08, 11.1); courtyardLawn.receiveShadow = true; groupGround.add(courtyardLawn);
+
+      const borderStoneMat = makeMat(0xa8a29e, { roughness: 0.78 });
+      const westBorder = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.28, 47.8), borderStoneMat); westBorder.position.set(-8.7, 0.16, 11.1);
+      const eastBorder = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.28, 47.8), borderStoneMat); eastBorder.position.set(13.5, 0.16, 11.1);
+      groupFloor1.add(westBorder, eastBorder);
+
+      // 蜿蜒卵石旱溪水道與跨渠平鋪石板小橋 (X = 5.8, Z = 9.6)
+      const pebbleMat = makeMat(0x78716c, { roughness: 0.92 });
+      [[2.5, -8.0], [3.6, -4.0], [4.8, 0.0], [5.8, 4.5], [5.8, 9.6], [5.4, 13.5], [4.8, 17.0]].forEach(([cx, cz], idx) => {
+        const seg = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.55, 0.12, 12), pebbleMat);
+        seg.scale.set(1.0, 1, 1.9); seg.position.set(cx, 0.14, cz); groupFloor1.add(seg);
+        [-1.35, 1.35].forEach(dx => {
+          const cobble = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32 + (idx % 2) * 0.08, 1), borderStoneMat);
+          cobble.scale.set(1.1, 0.65, 1.1); cobble.position.set(cx + dx, 0.22, cz); groupFloor1.add(cobble);
+        });
+      });
+
+      const bridgeGroup = new THREE.Group(); bridgeGroup.position.set(5.8, 0.24, 9.6);
+      const bridgeSlab = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.18, 2.2), makeMat(0xcbd5e1)); bridgeSlab.castShadow = true; bridgeGroup.add(bridgeSlab);
+      [-0.95, 0.95].forEach(bz => {
+        const curb = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.22, 0.22), makeMat(0x64748b)); curb.position.set(0, 0.16, bz); bridgeGroup.add(curb);
+      });
+      groupFloor1.add(bridgeGroup);
+
+      const stepSlabMat = makeMat(0x94a3b8);
+      [[-6.5, 9.6], [-3.8, 9.6], [-1.0, 9.6], [1.8, 9.6], [9.2, 9.6], [12.0, 9.6]].forEach(([sx, sz]) => {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 1.3), stepSlabMat); st.position.set(sx, 0.19, sz); groupFloor1.add(st);
+      });
+
+      // 辦公大樓前雕花石甕景觀與四季花叢
+      const urnGroup = new THREE.Group(); urnGroup.position.set(11.2, 0.16, 4.2);
+      const urnRing = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.5, 0.28, 20), makeMat(0x991b1b)); urnRing.position.y = 0.14;
+      const urnPedestal = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 1.5), makeMat(0x78716c)); urnPedestal.position.y = 0.65;
+      const urnBody = new THREE.Mesh(new THREE.SphereGeometry(1.05, 16, 16), makeMat(0xd6d3d1)); urnBody.position.y = 1.75; urnBody.scale.set(1, 1.25, 1);
+      urnGroup.add(urnRing, urnPedestal, urnBody); groupFloor1.add(urnGroup);
+
+      const flowerColors = [0xec4899, 0xfacc15, 0xa855f7, 0xf97316];
+      [[-4.5, -3.0], [-2.5, 3.5], [8.5, -4.5], [-4.2, 15.0], [9.5, 14.5], [-3.5, 29.5]].forEach(([fx, fz], idx) => {
+        const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75, 1), makeMat(0x15803d)); bush.scale.set(1.2, 0.65, 1.2); bush.position.set(fx, 0.35, fz);
+        const blossom = new THREE.Mesh(new THREE.DodecahedronGeometry(0.48, 1), makeMat(flowerColors[idx % 4])); blossom.position.set(fx, 0.65, fz);
+        groupFloor1.add(bush, blossom);
+      });
+
+      // 自然疊石生態池 (X = 4.2, Z = 21.5)
+      const pondGroup = new THREE.Group(); pondGroup.position.set(4.2, 0.16, 21.5);
+      const waterMat = makeMat(0x0284c7, { roughness: 0.18, metalness: 0.35 });
+      const mainWater = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, 0.24, 32), waterMat); mainWater.scale.set(1.05, 1, 1.22); mainWater.position.set(0, 0.12, 0);
+      const subWater = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.24, 28), waterMat); subWater.scale.set(1.1, 1, 1.0); subWater.position.set(-2.6, 0.12, -2.8);
+      pondGroup.add(mainWater, subWater);
+
+      const rockMats = [makeMat(0x78716c), makeMat(0x57534e), makeMat(0xa8a29e)];
+      for (let i = 0; i < 28; i++) {
+        const ang = (i / 28) * Math.PI * 2;
+        const rx = Math.cos(ang) * 6.55 + (ang > Math.PI && ang < Math.PI * 1.65 ? -1.8 : 0);
+        const rz = Math.sin(ang) * 7.55 + (ang > Math.PI && ang < Math.PI * 1.65 ? -1.4 : 0);
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.62 + (i % 3) * 0.22, 1), rockMats[i % 3]);
+        rock.scale.set(1.15, 0.68, 1.05); rock.position.set(rx, 0.28, rz); rock.rotation.y = i * 0.7; rock.castShadow = true;
+        pondGroup.add(rock);
+      }
+
+      const islandRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.05, 1), rockMats[0]);
+      islandRock.scale.set(1.3, 0.75, 1.1); islandRock.position.set(-1.2, 0.35, -1.0); pondGroup.add(islandRock);
+
+      const padMat = makeMat(0x16a34a), lotusMat = makeMat(0xf472b6);
+      [[-2.2, -2.5], [1.8, -2.2], [2.6, 1.2], [-1.5, 3.2], [0.8, 3.8], [0.2, -0.2], [-3.2, -1.2], [2.2, -0.6]].forEach(([lx, lz], idx) => {
+        const lily = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.04, 16), padMat); lily.position.set(lx, 0.26, lz); pondGroup.add(lily);
+        if (idx % 2 === 0) {
+          const flower = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.32, 8), lotusMat); flower.position.set(lx, 0.42, lz); pondGroup.add(flower);
+        }
+      });
+
+      const reedMat = makeMat(0x15803d);
+      [[-4.2, -3.5], [-4.8, -2.0], [-3.5, 4.2], [3.8, -3.8]].forEach(([rx, rz]) => {
+        for (let k = 0; k < 4; k++) {
+          const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.35 + k * 0.15, 6), reedMat);
+          stem.position.set(rx + (k - 1.5) * 0.18, 0.75, rz + (k % 2) * 0.18); pondGroup.add(stem);
+        }
+      });
+
+      const deckGroup = new THREE.Group(); deckGroup.position.set(6.2, 0.28, -0.5);
+      const woodDeck = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.16, 4.4), makeMat(0x78350f));
+      const deckRail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.85, 4.0), makeMat(0x5c2d16)); deckRail.position.set(-1.1, 0.5, 0);
+      deckGroup.add(woodDeck, deckRail); pondGroup.add(deckGroup);
+      groupFloor1.add(pondGroup);
+
+      // 東側花園、溫室與紫蝶步道
+      const eastGardenLawn = new THREE.Mesh(new THREE.BoxGeometry(48, 0.18, 42), makeMat(0x65a30d));
+      eastGardenLawn.position.set(70, 0.09, 15); groupGround.add(eastGardenLawn);
+      const ghBody = new THREE.Mesh(new THREE.BoxGeometry(12, 3.6, 15), makeMat(0x4ade80, { transparent: true, opacity: 0.58 }));
+      ghBody.position.set(56, 1.98, 15); groupFloor1.add(ghBody);
+      for (let sx = 50; sx <= 68; sx += 4.2) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.15, 3.6), stepSlabMat); st.position.set(sx, 0.22, -1); groupFloor1.add(st);
+      }
+      for (let sz = -1; sz <= 32; sz += 4.0) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.15, 2.5), stepSlabMat); st.position.set(69, 0.22, sz); groupFloor1.add(st);
+      }
+    }
+
+    function create3DGateButterflySculpture(scale = 1.0, wingHex = 0x7e22ce) {
+      const bg = new THREE.Group();
+      const wingMat = makeMat(wingHex, { roughness: 0.35, doubleSide: true }), spotMat = makeMat(0xf8fafc);
+      [-1, 1].forEach(dir => {
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(0.95 * scale, 1.25 * scale, 0.08 * scale), wingMat);
+        wing.position.set(dir * 0.45 * scale, 0, 0); wing.rotation.y = -dir * 0.35; wing.rotation.z = dir * 0.18;
+        const spot = new THREE.Mesh(new THREE.SphereGeometry(0.16 * scale, 8, 8), spotMat); spot.position.set(dir * 0.52 * scale, 0.18 * scale, 0.05 * scale);
+        bg.add(wing, spot);
+      });
+      return bg;
+    }
+
+    function buildGatesAndPerimeterWalls() {
+      const mainGate = new THREE.Group(); mainGate.position.set(-16, 0, 64);
+      const leftPillarMat = new THREE.MeshStandardMaterial({ map: createMainGatePillarTexture('left') });
+      const rightPillarMat = new THREE.MeshStandardMaterial({ map: createMainGatePillarTexture('right') });
+      const stoneSideMat = makeMat(0xb8b2a6);
+
+      const leftPillarGroup = new THREE.Group(); leftPillarGroup.position.set(-6.5, 0, 0);
+      const pLeftMain = new THREE.Mesh(new THREE.BoxGeometry(2.35, 3.85, 1.55), [stoneSideMat, stoneSideMat, stoneSideMat, stoneSideMat, leftPillarMat, leftPillarMat]);
+      pLeftMain.position.y = 1.925; pLeftMain.castShadow = true;
+      const leftTopButterfly = create3DGateButterflySculpture(0.95, 0x9333ea); leftTopButterfly.position.set(-0.25, 4.45, 0.25);
+      leftPillarGroup.add(pLeftMain, leftTopButterfly);
+
+      const rightPillarGroup = new THREE.Group(); rightPillarGroup.position.set(6.5, 0, 0);
+      const pRightMain = new THREE.Mesh(new THREE.BoxGeometry(2.55, 5.25, 1.65), [stoneSideMat, stoneSideMat, stoneSideMat, stoneSideMat, rightPillarMat, rightPillarMat]);
+      pRightMain.position.y = 2.625; pRightMain.castShadow = true;
+      const bUpperL1 = create3DGateButterflySculpture(0.85, 0xa855f7); bUpperL1.position.set(-1.38, 4.65, 0.35);
+      const bMidR = create3DGateButterflySculpture(0.92, 0x7e22ce); bMidR.position.set(1.38, 2.85, 0.35);
+      rightPillarGroup.add(pRightMain, bUpperL1, bMidR);
+      mainGate.add(leftPillarGroup, rightPillarGroup); groupFloor1.add(mainGate);
+
+      const whiteWallMat = new THREE.MeshStandardMaterial({ map: createWhiteTiledLowWallTexture(7), roughness: 0.55 });
+      const whiteCopingMat = makeMat(0xe2e8f0);
+      const eastWhiteWall = new THREE.Mesh(new THREE.BoxGeometry(56.0, 1.28, 0.52), [whiteCopingMat, whiteCopingMat, whiteCopingMat, whiteCopingMat, whiteWallMat, whiteWallMat]);
+      eastWhiteWall.position.set(19.4, 0.64, 64.0); eastWhiteWall.castShadow = true; groupFloor1.add(eastWhiteWall);
+      for (let px = -8.2; px <= 47.4; px += 8.0) {
+        const pier = new THREE.Mesh(new THREE.BoxGeometry(0.68, 1.44, 0.68), makeMat(0xf8fafc)); pier.position.set(px, 0.72, 64.0); groupFloor1.add(pier);
+      }
+
+      const southWestWall = new THREE.Mesh(new THREE.BoxGeometry(78.4, 1.28, 0.52), [whiteCopingMat, whiteCopingMat, whiteCopingMat, whiteCopingMat, whiteWallMat, whiteWallMat]);
+      southWestWall.position.set(-62.8, 0.64, 64.0);
+      const southEastWall = new THREE.Mesh(new THREE.BoxGeometry(46, 1.28, 0.52), [whiteCopingMat, whiteCopingMat, whiteCopingMat, whiteCopingMat, whiteWallMat, whiteWallMat]);
+      southEastWall.position.set(79, 0.64, 64.0);
+      groupFloor1.add(southWestWall, southEastWall);
+    }
+
+    const butterflies = [];
+    function buildCampusTrees() {
+      const trunkMat = makeMat(0x5c4033), crownMats = [makeMat(0x15803d), makeMat(0x166534), makeMat(0x3f6212)];
+      [
+        [-25, 40, 1.3], [-25, 30, 1.25], [-25, 18, 1.2], [-8, 56, 1.2], [-8, 44, 1.25], [-8, 32, 1.3],
+        [-35, 50, 1.5], [-46, 48, 1.4], [-58, 48, 1.5], [-70, 50, 1.3], [-84, 52, 1.4],
+        [-102, 36, 1.3], [-102, 14, 1.4], [-100, -6, 1.3],
+        [-69, -15, 1.45], [-63, -18, 1.55], [-57, -14, 1.35], [-53, -19, 1.6], [-48, -15, 1.45], [-44, -18, 1.5],
+        [-5, 6, 1.0], [8, 28, 0.95], [50, 28, 1.1], [88, 28, 1.2], [90, -2, 1.15], [46, -50, 1.2], [90, -45, 1.3]
+      ].forEach(([tx, tz, scale], idx) => {
+        const tg = new THREE.Group(); tg.position.set(tx, 0, tz);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * scale, 0.5 * scale, 3.2 * scale, 8), trunkMat); trunk.position.y = 1.6 * scale;
+        const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(2.8 * scale, 1), crownMats[idx % 3]); crown.position.y = 4.2 * scale; crown.castShadow = true;
+        tg.add(trunk, crown); groupFloor1.add(tg);
+      });
+
+      for (let px = -9; px <= 55; px += 6.4) {
+        const pineGroup = new THREE.Group(); pineGroup.position.set(px, 0.35, -37.2);
+        const pTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.35, 9.5, 8), trunkMat); pTrunk.position.y = 4.75; pineGroup.add(pTrunk);
+        for (let tier = 0; tier < 5; tier++) {
+          const cone = new THREE.Mesh(new THREE.ConeGeometry(2.5 - tier * 0.38, 2.4, 10), crownMats[tier % 3]); cone.position.y = 3.2 + tier * 1.55; pineGroup.add(cone);
+        }
+        groupFloor1.add(pineGroup);
+      }
+
+      const wingMat = new THREE.MeshBasicMaterial({ color: 0xa855f7, side: THREE.DoubleSide });
+      const butterflyCenters = [[4.2, 21.5], [6, 52], [-16, 62], [56, 15], [75, 18], [-89, 7.4]];
+      for (let i = 0; i < 16; i++) {
+        const bg = new THREE.Group();
+        const leftWing = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.35), wingMat); leftWing.position.x = -0.22;
+        const rightWing = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.35), wingMat); rightWing.position.x = 0.22;
+        bg.add(leftWing, rightWing);
+        const [cx, cz] = butterflyCenters[i % 6];
+        scene.add(bg);
+        butterflies.push({ group: bg, leftWing, rightWing, baseX: cx, baseZ: cz, radius: 3 + Math.random() * 6, speed: 0.8 + Math.random() * 0.9, phase: Math.random() * 6.28, baseY: 1.6 + Math.random() * 2.2 });
+      }
+    }
+
+    const character = { group: new THREE.Group(), x: 14.8, y: 0.0, z: 21.5, rotY: Math.PI / 2, vy: 0, onGround: true, targetFloor: 1, walkCycle: 0 };
+    let charLeftLeg, charRightLeg, charLeftArm, charRightArm, charRing;
+
+    function buildCharacterAvatar() {
+      const g = character.group;
+      g.position.set(character.x, character.y, character.z); g.rotation.y = character.rotY;
+      charRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.05, 24), new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide }));
+      charRing.rotation.x = -Math.PI / 2; charRing.position.y = 0.08; g.add(charRing);
+
+      const legMat = makeMat(0x1e3a8a);
+      charLeftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.9, 0.32), legMat); charLeftLeg.position.set(-0.22, 0.45, 0);
+      charRightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.9, 0.32), legMat); charRightLeg.position.set(0.22, 0.45, 0);
+
+      const shirtFrontBackMat = new THREE.MeshStandardMaterial({ map: createButterflyShirtTexture(), roughness: 0.6 });
+      const shirtSideMat = makeMat(0xe9d5ff);
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.06, 0.48), [shirtSideMat, shirtSideMat, shirtSideMat, shirtSideMat, shirtFrontBackMat, shirtFrontBackMat]);
+      torso.position.set(0, 1.4, 0); torso.castShadow = true;
+
+      const sleeveMat = makeMat(0xd8b4fe);
+      charLeftArm = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.85, 0.26), sleeveMat); charLeftArm.position.set(-0.58, 1.4, 0);
+      charRightArm = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.85, 0.26), sleeveMat); charRightArm.position.set(0.58, 1.4, 0);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), makeMat(0xfde68a)); head.position.set(0, 2.3, 0);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.22, 16), makeMat(0x9333ea)); cap.position.set(0, 2.55, 0);
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.35), makeMat(0x7e22ce)); visor.position.set(0, 2.48, -0.35);
+
+      g.add(charLeftLeg, charRightLeg, torso, charLeftArm, charRightArm, head, cap, visor);
+      scene.add(g);
+    }
+
+    const WALKABLE_2F_ZONES = [
+      { xMin: -14.1, xMax: 92.1, zMin: -16.85, zMax: -14.25 },
+      { xMin: 21.8, xMax: 24.65, zMin: -16.85, zMax: 35.05 },
+      { xMin: 38.5, xMax: 41.3, zMin: -31.2, zMax: -14.25 },
+      { xMin: 47.1, xMax: 53.1, zMin: -31.2, zMax: -14.25 },
+      { xMin: 38.5, xMax: 53.1, zMin: -31.2, zMax: -26.3 },
+      { xMin: 44.3, xMax: 46.65, zMin: -25.8, zMax: -14.25 },
+      { xMin: 41.75, xMax: 46.65, zMin: -25.8, zMax: -22.7 },
+      { xMin: 21.8, xMax: 33.5, zMin: -12.35, zMax: -9.05 },
+      { xMin: 30.5, xMax: 33.5, zMin: -12.35, zMax: -5.45 }
+    ];
+
+    const BUILDING_COLLIDERS_1F = [
+      { xMin: -14.8, xMax: 38.25, zMin: -32.3, zMax: -17.05 },
+      { xMin: 46.75, xMax: 92.8, zMin: -32.3, zMax: -17.05 },
+      { xMin: 41.55, xMax: 46.85, zMin: -32.3, zMax: -25.9 },
+      { xMin: 24.85, xMax: 41.3, zMin: -5.25, zMax: 35.75 },
+      { xMin: 33.75, xMax: 41.3, zMin: -13.6, zMax: -5.25 },
+      { xMin: -41.5, xMax: -29.5, zMin: -25.6, zMax: 0.6 },
+      { xMin: -29.5, xMax: -22.1, zMin: -25.6, zMax: 0.6 },
+      { xMin: -29.8, xMax: -21.8, zMin: -32.3, zMax: -26.7 },
+      { xMin: -80.2, xMax: -72.8, zMin: -10.8, zMax: 0.8 },
+      { xMin: -57.5, xMax: -49.5, zMin: -5.3, zMax: 0.8 },
+      { xMin: 15.8, xMax: 40.2, zMin: -60.2, zMax: -46.8 },
+      { xMin: -2.7, xMax: 14.7, zMin: 48.8, zMax: 61.2 },
+      { xMin: 17.3, xMax: 34.7, zMin: 48.8, zMax: 61.2 },
+      { xMin: 49.8, xMax: 62.2, zMin: 7.3, zMax: 22.7 },
+      { xMin: -100.3, xMax: -98.6, zMin: 19.5, zMax: 35.5 },
+      { xMin: 57.9, xMax: 61.1, zMin: -12.4, zMax: -9.2 },
+      { xMin: -22.9, xMax: -22.1, zMin: 5.6, zMax: 63.4 },
+      { xMin: -26.6, xMax: -23.8, zMin: 50.6, zMax: 53.4 },
+      { xMin: -9.85, xMax: -9.15, zMin: 6.0, zMax: 35.0 },
+      { xMin: -9.85, xMax: -9.15, zMin: 43.0, zMax: 63.0 },
+      { xMin: -23.9, xMax: -21.1, zMin: 63.1, zMax: 64.9 },
+      { xMin: -10.9, xMax: -8.1, zMin: 63.1, zMax: 64.9 },
+      { xMin: -8.8, xMax: 47.6, zMin: 63.4, zMax: 64.6 },
+      { xMin: -102.0, xMax: -23.5, zMin: 63.4, zMax: 64.6 },
+      { xMin: 56.0, xMax: 102.0, zMin: 63.4, zMax: 64.6 }
+    ];
+
+    function isCollidingWith1FBuildings(px, pz, radius = 0.45) {
+      if (px >= 38.35 && px <= 41.45 && pz >= -32.6 && pz <= -17.0) return false;
+      if (px >= 41.7 && px <= 44.1 && pz >= -25.8 && pz <= -17.0) return false;
+      if (px >= 24.8 && px <= 33.6 && pz >= -8.85 && pz <= -5.4) return false;
+      return BUILDING_COLLIDERS_1F.some(b => px + radius > b.xMin && px - radius < b.xMax && pz + radius > b.zMin && pz - radius < b.zMax);
+    }
+
+    function computeGroundAndStairElevation(cx, cz) {
+      if (cx >= 41.6 && cx <= 46.8 && cz >= -26.0 && cz <= -17.0) {
+        if (cz <= -22.8) { character.targetFloor = 1.5; updateCharacterFloorBadge(); return 2.38; }
+        if (cx < 44.2) { const r1 = Math.max(0, Math.min(1, (-17.2 - cz) / 5.6)); character.targetFloor = r1 > 0.35 ? 1.5 : 1; updateCharacterFloorBadge(); return 0.28 + r1 * 2.10; }
+        const r2 = Math.max(0, Math.min(1, (cz - (-22.8)) / 5.6)); character.targetFloor = r2 > 0.72 ? 2 : 1.5; updateCharacterFloorBadge(); return 2.38 + r2 * 2.10;
+      }
+      if (cx >= 24.8 && cx <= 33.8 && cz >= -12.5 && cz <= -5.3) {
+        if (cx >= 30.6) { character.targetFloor = 1.5; updateCharacterFloorBadge(); return 2.38; }
+        if (cz >= -8.9) { const r1 = Math.max(0, Math.min(1, (cx - 25.0) / 5.6)); character.targetFloor = r1 > 0.35 ? 1.5 : 1; updateCharacterFloorBadge(); return 0.28 + r1 * 2.10; }
+        const r2 = Math.max(0, Math.min(1, (30.6 - cx) / 5.6)); character.targetFloor = r2 > 0.72 ? 2 : 1.5; updateCharacterFloorBadge(); return 2.38 + r2 * 2.10;
+      }
+      if (character.targetFloor === 2) return 4.48;
+      if ((cx >= -15.2 && cx <= 93.2 && cz >= -18.0 && cz <= -13.3) || (cx >= 38.2 && cx <= 41.6 && cz >= -32.3 && cz <= -13.3) || (cx >= 20.6 && cx <= 25.4 && cz >= -13.8 && cz <= 36.0)) {
+        if (character.targetFloor === 1.5) { character.targetFloor = 1; updateCharacterFloorBadge(); }
+        return 0.28;
+      }
+      return 0.0;
+    }
+
+    function applyCorridorWallCollision(nx, nz, radius = 0.45) {
+      const ox = state.isDriving ? drivableCar.x : character.x;
+      const oz = state.isDriving ? drivableCar.z : character.z;
+      if (!state.isDriving && ox >= 41.65 && ox <= 46.7 && oz < -17.05 && oz >= -25.9) {
+        nx = Math.max(41.75, Math.min(46.65, nx)); nz = Math.max(-25.8, nz);
+        if (nz > -22.7 && oz > -22.7) nx = ox < 44.2 ? Math.min(44.05, nx) : Math.max(44.35, nx);
+        return [nx, nz];
+      }
+      if (!state.isDriving && ox > 24.85 && ox <= 33.7 && oz >= -12.45 && oz <= -5.35) {
+        nz = Math.max(-12.35, Math.min(-5.45, nz)); nx = Math.min(33.5, nx);
+        if (nx < 30.5 && ox < 30.5) nz = oz >= -8.9 ? Math.max(-8.75, nz) : Math.min(-9.05, nz);
+        return [nx, nz];
+      }
+      if (!state.isDriving && character.targetFloor === 2) {
+        if (WALKABLE_2F_ZONES.some(z => nx >= z.xMin && nx <= z.xMax && nz >= z.zMin && nz <= z.zMax)) return [nx, nz];
+        return [ox, oz];
+      }
+      if (!isCollidingWith1FBuildings(nx, nz, radius)) return [nx, nz];
+      if (!isCollidingWith1FBuildings(nx, oz, radius)) return [nx, oz];
+      if (!isCollidingWith1FBuildings(ox, nz, radius)) return [ox, nz];
+      return [ox, oz];
+    }
+
+    const orbit = { target: new THREE.Vector3(4.2, 1.5, 21.5), spherical: new THREE.Spherical(24, 1.18, -0.55), isDragging: false, isPanning: false, prevX: 0, prevY: 0, flyAnim: null };
+
+    function updateOrbitCamera() {
+      orbit.spherical.phi = Math.max(0.18, Math.min(Math.PI / 2 - 0.03, orbit.spherical.phi));
+      orbit.spherical.radius = Math.max(6, Math.min(240, orbit.spherical.radius));
+      camera.position.copy(orbit.target).add(new THREE.Vector3().setFromSpherical(orbit.spherical));
+      camera.lookAt(orbit.target);
+    }
+
+    function flyCameraTo(tx, ty, tz, offsetArr = [0, 14, 22]) {
+      const startTarget = orbit.target.clone(), endTarget = new THREE.Vector3(tx, ty, tz);
+      const endSpherical = new THREE.Spherical().setFromVector3(new THREE.Vector3(tx + offsetArr[0], ty + offsetArr[1], tz + offsetArr[2]).sub(endTarget));
+      orbit.flyAnim = { startTime: performance.now(), duration: 650, startTarget, endTarget, startR: orbit.spherical.radius, endR: endSpherical.radius, startPhi: orbit.spherical.phi, endPhi: endSpherical.phi, startTheta: orbit.spherical.theta, endTheta: endSpherical.theta };
+    }
+
+    const domElem = renderer.domElement;
+    domElem.addEventListener('contextmenu', e => e.preventDefault());
+    domElem.addEventListener('pointerdown', e => {
+      orbit.flyAnim = null; orbit.prevX = e.clientX; orbit.prevY = e.clientY;
+      if (e.button === 2 || e.shiftKey) orbit.isPanning = true; else orbit.isDragging = true;
+    });
+    window.addEventListener('pointermove', e => {
+      if (!orbit.isDragging && !orbit.isPanning) return;
+      const dx = e.clientX - orbit.prevX, dy = e.clientY - orbit.prevY;
+      orbit.prevX = e.clientX; orbit.prevY = e.clientY;
+      if (state.mode === 'walk') { if (state.isDriving) drivableCar.rotY -= dx * 0.0055; else character.rotY -= dx * 0.0065; return; }
+      if (orbit.isDragging) { orbit.spherical.theta -= dx * 0.0065; orbit.spherical.phi -= dy * 0.0055; updateOrbitCamera(); }
+      else if (orbit.isPanning) {
+        const panSpeed = orbit.spherical.radius * 0.0014;
+        const forward = new THREE.Vector3(); camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
+        const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+        orbit.target.addScaledVector(right, -dx * panSpeed); orbit.target.addScaledVector(forward, dy * panSpeed);
+        updateOrbitCamera();
+      }
+    });
+    window.addEventListener('pointerup', () => { orbit.isDragging = false; orbit.isPanning = false; });
+    domElem.addEventListener('wheel', e => { e.preventDefault(); if (state.mode === 'orbit') { orbit.flyAnim = null; orbit.spherical.radius += e.deltaY * 0.065; updateOrbitCamera(); } }, { passive: false });
+
+    const keys = { w: false, a: false, s: false, d: false, q: false, e: false, space: false };
+
+    function toggleCarDriving() {
+      if (state.isDriving) {
+        state.isDriving = false;
+        character.x = drivableCar.x - Math.cos(drivableCar.rotY) * 2.4;
+        character.z = drivableCar.z + Math.sin(drivableCar.rotY) * 2.4;
+        character.y = 0; character.rotY = drivableCar.rotY; character.group.visible = true;
+        document.getElementById('hud-mode-title').textContent = '🎮 人物走動控制';
+      } else {
+        if (state.mode !== 'walk') setNavigationMode('walk');
+        state.isDriving = true; character.targetFloor = 1; character.group.visible = false;
+        document.getElementById('hud-mode-title').textContent = '🚗 黑色轎車駕駛模式';
+      }
+      updateCharacterFloorBadge();
+    }
+    document.getElementById('btn-toggle-drive').addEventListener('click', toggleCarDriving);
+
+    window.addEventListener('keydown', e => {
+      if (document.activeElement && document.activeElement.id === 'search-input') return;
+      const k = e.key.toLowerCase();
+      if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
+      if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+      if (k === 'a') keys.a = true;
+      if (k === 'd') keys.d = true;
+      if (k === 'q' || e.key === 'ArrowLeft') keys.q = true;
+      if (k === 'e' || e.key === 'ArrowRight') keys.e = true;
+      if (k === 'f' && (state.isDriving || Math.hypot(character.x - drivableCar.x, character.z - drivableCar.z) <= 9.5)) toggleCarDriving();
+      if (e.key === ' ' && character.onGround && state.mode === 'walk' && !state.isDriving) { character.vy = 7.2; character.onGround = false; }
+      if (e.key === 'Shift') { state.sprint = !state.sprint; updateSprintButtonUI(); }
+    });
+    window.addEventListener('keyup', e => {
+      const k = e.key.toLowerCase();
+      if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
+      if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+      if (k === 'a') keys.a = false;
+      if (k === 'd') keys.d = false;
+      if (k === 'q' || e.key === 'ArrowLeft') keys.q = false;
+      if (k === 'e' || e.key === 'ArrowRight') keys.e = false;
+    });
+
+    ['w', 's', 'a', 'd', 'q', 'e'].forEach(k => {
+      const btn = document.getElementById(`pad-${k}`);
+      if (!btn) return;
+      btn.addEventListener('pointerdown', e => { e.preventDefault(); keys[k] = true; });
+      btn.addEventListener('pointerup', e => { e.preventDefault(); keys[k] = false; });
+      btn.addEventListener('pointerleave', e => { e.preventDefault(); keys[k] = false; });
+    });
+
+    document.getElementById('pad-jump').addEventListener('click', () => { if (character.onGround && !state.isDriving) { character.vy = 7.2; character.onGround = false; } });
+    function updateSprintButtonUI() {
+      const btn = document.getElementById('pad-sprint');
+      btn.textContent = state.sprint ? '⚡ 跑步：開' : '⚡ 跑步：關';
+      btn.className = state.sprint ? 'py-1.5 rounded-xl bg-emerald-600 text-xs font-bold text-white' : 'py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-xs font-bold text-white';
+    }
+    document.getElementById('pad-sprint').addEventListener('click', () => { state.sprint = !state.sprint; updateSprintButtonUI(); });
+
+    const labelDomMap = new Map(), roadDomList = [];
+    function init3DLabels() {
+      labelsContainer.innerHTML = ''; labelDomMap.clear(); roadDomList.length = 0;
+      CAMPUS_POIS.forEach(poi => {
+        const el = document.createElement('div');
+        const badgeClass = poi.category === '1f' ? 'badge-1f' : poi.category === '2f' ? 'badge-2f' : poi.category === 'sport' ? 'badge-sport' : poi.category === 'eco' ? 'badge-eco' : 'badge-gate';
+        el.className = `poi-label ${badgeClass} ${poi.isSub ? 'badge-util' : ''}`;
+        const floorPrefix = poi.category === '1f' ? '<span class="opacity-80 text-[10px]">[1F]</span>' : poi.category === '2f' ? '<span class="opacity-80 text-[10px]">[2F]</span>' : '';
+        el.innerHTML = `${floorPrefix}<span>${poi.name}</span>`;
+        el.addEventListener('click', e => { e.stopPropagation(); selectPoi(poi.id, false); });
+        labelsContainer.appendChild(el); labelDomMap.set(poi.id, el);
+      });
+      ROAD_MARKERS.forEach(rm => {
+        const el = document.createElement('div'); el.className = 'road-label'; el.textContent = rm.text;
+        labelsContainer.appendChild(el); roadDomList.push({ data: rm, el });
+      });
+    }
+
+    function update3DLabelsProjection() {
+      if (state.hideAllLabels) { labelDomMap.forEach(el => { el.style.display = 'none'; }); roadDomList.forEach(({ el }) => { el.style.display = 'none'; }); return; }
+      const halfW = window.innerWidth / 2, halfH = window.innerHeight / 2, tempV = new THREE.Vector3();
+      CAMPUS_POIS.forEach(poi => {
+        const el = labelDomMap.get(poi.id);
+        if (!el) return;
+        if ((poi.isSub && !state.showSubLabels) || (state.categoryFilter !== 'all' && poi.category !== state.categoryFilter)) { el.style.display = 'none'; return; }
+        const labelY = poi.floor === 2 ? 7.9 : (poi.category === '1f' ? 3.5 : poi.y + 3.2);
+        tempV.set(poi.x, labelY, poi.z).project(camera);
+        if (tempV.z > 1.0 || tempV.z < -1.0) { el.style.display = 'none'; return; }
+        const sx = tempV.x * halfW + halfW, sy = -tempV.y * halfH + halfH;
+        if (sx < -60 || sx > window.innerWidth + 60 || sy < -40 || sy > window.innerHeight + 40) { el.style.display = 'none'; return; }
+        el.style.display = 'inline-flex'; el.style.left = `${sx}px`; el.style.top = `${sy}px`;
+        el.classList.toggle('active-poi', state.selectedPoiId === poi.id);
+      });
+      roadDomList.forEach(({ data, el }) => {
+        tempV.set(data.x, data.y, data.z).project(camera);
+        if (tempV.z > 1.0 || tempV.z < -1.0) { el.style.display = 'none'; return; }
+        el.style.display = 'block'; el.style.left = `${tempV.x * halfW + halfW}px`; el.style.top = `${-tempV.y * halfH + halfH}px`;
+      });
+    }
+
+    function renderSidebarList() {
+      const listEl = document.getElementById('poi-list');
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = CAMPUS_POIS.filter(poi => (state.categoryFilter === 'all' || poi.category === state.categoryFilter) && (!q || poi.name.toLowerCase().includes(q) || poi.fullTitle.toLowerCase().includes(q) || poi.zone.toLowerCase().includes(q)));
+      document.getElementById('poi-count-badge').textContent = `${filtered.length} 個空間`;
+      listEl.innerHTML = '';
+      filtered.forEach(poi => {
+        const isSelected = poi.id === state.selectedPoiId;
+        const tagColor = poi.category === '1f' ? 'bg-slate-600 text-white' : poi.category === '2f' ? 'bg-pink-600 text-white' : poi.category === 'sport' ? 'bg-orange-600 text-white' : poi.category === 'eco' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white';
+        const tagLabel = poi.category === '1f' ? '1F' : poi.category === '2f' ? '2F' : poi.category === 'sport' ? '運動' : poi.category === 'eco' ? '生態' : '校門';
+        const item = document.createElement('div');
+        item.className = `p-2 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 ${isSelected ? 'bg-indigo-600/35 border-indigo-400 shadow' : 'bg-slate-800/65 hover:bg-slate-800 border-slate-700/60'}`;
+        item.innerHTML = `<div class="flex items-center gap-2 min-w-0"><span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 ${tagColor}">${tagLabel}</span><div class="min-w-0"><div class="text-xs font-bold text-white truncate">${poi.name}</div><div class="text-[10px] text-slate-400 truncate">${poi.zone}</div></div></div><button class="walk-here-btn px-2 py-1 rounded-lg bg-slate-700/90 hover:bg-emerald-600 text-[10px] font-bold text-slate-200 hover:text-white shrink-0 transition">🚶 走動</button>`;
+        item.addEventListener('click', () => selectPoi(poi.id, false));
+        item.querySelector('.walk-here-btn').addEventListener('click', e => { e.stopPropagation(); selectPoi(poi.id, true); });
+        listEl.appendChild(item);
+      });
+    }
+
+    function selectPoi(poiId, forceTeleportWalk = false) {
+      const poi = CAMPUS_POIS.find(p => p.id === poiId);
+      if (!poi) return;
+      state.selectedPoiId = poi.id;
+      const badgeEl = document.getElementById('selected-badge');
+      badgeEl.textContent = poi.name;
+      badgeEl.className = `px-2.5 py-1 rounded-xl text-xs font-extrabold text-white shrink-0 ${poi.category === '1f' ? 'bg-slate-600' : poi.category === '2f' ? 'bg-pink-600' : poi.category === 'sport' ? 'bg-orange-600' : poi.category === 'eco' ? 'bg-emerald-600' : 'bg-blue-600'}`;
+      document.getElementById('selected-title').textContent = poi.fullTitle;
+      document.getElementById('selected-Zone').textContent = `${poi.zone}｜點擊右側按鈕可傳送人物至此走動`;
+      if (forceTeleportWalk || state.mode === 'walk') {
+        if (state.isDriving) toggleCarDriving();
+        teleportCharacterToPoi(poi);
+        if (forceTeleportWalk && state.mode !== 'walk') setNavigationMode('walk');
+      } else flyCameraTo(poi.x, poi.floor === 2 ? 6.0 : 2.0, poi.z, poi.camOffset);
+      renderSidebarList();
+    }
+
+    function teleportCharacterToPoi(poi) {
+      character.targetFloor = poi.floor || 1; character.vy = 0; character.onGround = true;
+      if (poi.walkPos) { character.x = poi.walkPos[0]; character.z = poi.walkPos[1]; character.rotY = poi.walkPos[2]; }
+      else { character.x = poi.x; character.z = poi.z + 4.0; character.rotY = Math.PI; }
+      character.y = computeGroundAndStairElevation(character.x, character.z);
+      character.group.position.set(character.x, character.y, character.z);
+      character.group.rotation.y = character.rotY;
+      updateCharacterFloorBadge();
+    }
+
+    function updateCharacterFloorBadge() {
+      const el = document.getElementById('char-floor-indicator');
+      if (state.isDriving) { el.textContent = '狀態：🚗 駕駛黑色轎車中'; el.className = 'px-2 py-0.5 rounded bg-amber-500/30 text-amber-200 font-bold'; }
+      else if (character.targetFloor === 2) { el.textContent = '位置：2F 二樓走廊'; el.className = 'px-2 py-0.5 rounded bg-pink-500/30 text-pink-200 font-bold'; }
+      else if (character.targetFloor === 1.5) { el.textContent = '位置：0.5F 樓梯平台'; el.className = 'px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-200 font-bold'; }
+      else { el.textContent = '位置：1F 走廊/戶外'; el.className = 'px-2 py-0.5 rounded bg-slate-700 text-amber-300 font-bold'; }
+    }
+
+    function setNavigationMode(mode) {
+      state.mode = mode;
+      const orbitBtn = document.getElementById('mode-orbit-btn'), walkBtn = document.getElementById('mode-walk-btn');
+      const povBtn = document.getElementById('btn-walk-pov'), walkHud = document.getElementById('walk-hud');
+      if (mode === 'walk') {
+        walkBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-emerald-600 text-white shadow';
+        orbitBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white';
+        povBtn.classList.remove('hidden'); walkHud.classList.remove('hidden');
+      } else {
+        if (state.isDriving) toggleCarDriving();
+        orbitBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow';
+        walkBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white';
+        povBtn.classList.add('hidden'); walkHud.classList.add('hidden');
+        orbit.target.set(character.x, character.y + 1.8, character.z); updateOrbitCamera();
+      }
+    }
+
+    const minimapCanvas = document.getElementById('minimap-canvas'), mCtx = minimapCanvas.getContext('2d');
+    function worldToMinimap(wx, wz) { return [((wx + 115) / 230) * minimapCanvas.width, ((wz + 75) / 150) * minimapCanvas.height]; }
+    function minimapToWorld(mx, mz) { return [(mx / minimapCanvas.width) * 230 - 115, (mz / minimapCanvas.height) * 150 - 75]; }
+
+    function drawMinimap() {
+      if (state.minimapCollapsed) return;
+      const w = minimapCanvas.width, h = minimapCanvas.height;
+      mCtx.clearRect(0, 0, w, h); mCtx.fillStyle = '#f8fafc'; mCtx.fillRect(0, 0, w, h);
+      mCtx.strokeStyle = '#334155'; mCtx.lineWidth = 2; mCtx.strokeRect(6, 6, w - 12, h - 18);
+
+      const drawRectWorld = (x, z, rw, rd, fill, stroke, text = '') => {
+        const [x1, z1] = worldToMinimap(x - rw / 2, z - rd / 2), [x2, z2] = worldToMinimap(x + rw / 2, z + rd / 2);
+        mCtx.fillStyle = fill; mCtx.fillRect(x1, z1, x2 - x1, z2 - z1);
+        mCtx.strokeStyle = stroke; mCtx.lineWidth = 1; mCtx.strokeRect(x1, z1, x2 - x1, z2 - z1);
+        if (text) { mCtx.fillStyle = '#0f172a'; mCtx.font = 'bold 8px "Noto Sans TC", sans-serif'; mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle'; mCtx.fillText(text, (x1 + x2) / 2, (z1 + z2) / 2); }
+      };
+
+      const [tx, tz] = worldToMinimap(-53.5, 16.0);
+      mCtx.fillStyle = '#ea580c'; mCtx.beginPath(); mCtx.ellipse(tx, tz, 28, 16, 0, 0, Math.PI * 2); mCtx.fill();
+      mCtx.fillStyle = '#84cc16'; mCtx.beginPath(); mCtx.ellipse(tx, tz, 19, 10, 0, 0, Math.PI * 2); mCtx.fill();
+      drawRectWorld(-90.5, 27.5, 16, 27, '#6ee7b7', '#047857', '4籃球');
+      drawRectWorld(-89.2, 7.4, 14.8, 12.8, '#f472b6', '#be185d', '遊戲區');
+      drawRectWorld(-76.5, -5.0, 6.2, 11, '#bae6fd', '#0284c7', '3廁');
+      drawRectWorld(-53.5, -2.2, 7.6, 5.8, '#fed7aa', '#c2410c', '2司令台');
+      drawRectWorld(-35.5, -12.5, 11.6, 26, '#cbd5e1', '#475569', '1思源堂');
+      drawRectWorld(-25.8, -12.5, 7.2, 26, '#fed7aa', '#c2410c', '廚房');
+      drawRectWorld(-25.8, -29.5, 7.6, 5.2, '#bbf7d0', '#15803d', '機車');
+      drawRectWorld(-2, -53, 21, 11, '#cbd5e1', '#1e293b', '車庫(黑車)');
+      drawRectWorld(28, -53, 24, 13, '#cbd5e1', '#475569', '宿舍');
+      drawRectWorld(68, -54, 32, 20, '#bbf7d0', '#15803d', '晴天球場');
+      drawRectWorld(2.4, 11.1, 22.4, 47.8, '#dcfce7', '#15803d', '中庭/生態池');
+      drawRectWorld(6, 55, 17, 12, '#e2e8f0', '#475569', '蝴蝶館');
+      drawRectWorld(26, 55, 17, 12, '#e2e8f0', '#475569', '採風館');
+      drawRectWorld(39, -23.5, 108, 19, '#94a3b8', '#334155', '教學大樓');
+      drawRectWorld(31, 11, 20, 49, '#94a3b8', '#334155', '辦公樓');
+
+      const px = state.isDriving ? drivableCar.x : character.x, pz = state.isDriving ? drivableCar.z : character.z, pr = state.isDriving ? drivableCar.rotY : character.rotY;
+      const [cx, cz] = worldToMinimap(px, pz);
+      mCtx.save(); mCtx.translate(cx, cz); mCtx.rotate(-pr + Math.PI);
+      mCtx.fillStyle = state.isDriving ? '#111827' : '#a855f7';
+      mCtx.beginPath(); mCtx.moveTo(0, -6); mCtx.lineTo(4.5, 5); mCtx.lineTo(-4.5, 5); mCtx.closePath(); mCtx.fill();
+      mCtx.restore();
+    }
+
+    minimapCanvas.addEventListener('click', e => {
+      const rect = minimapCanvas.getBoundingClientRect();
+      const [wx, wz] = minimapToWorld(((e.clientX - rect.left) / rect.width) * minimapCanvas.width, ((e.clientY - rect.top) / rect.height) * minimapCanvas.height);
+      let nearest = null, bestDist = Infinity;
+      CAMPUS_POIS.forEach(poi => {
+        const d2 = (poi.x - wx) ** 2 + (poi.z - wz) ** 2;
+        if (d2 < bestDist) { bestDist = d2; nearest = poi; }
+      });
+      if (nearest) selectPoi(nearest.id, false);
+    });
+
+    document.getElementById('mode-orbit-btn').addEventListener('click', () => setNavigationMode('orbit'));
+    document.getElementById('mode-walk-btn').addEventListener('click', () => setNavigationMode('walk'));
+    document.getElementById('btn-walk-pov').addEventListener('click', e => {
+      state.walkPov = state.walkPov === 'third' ? 'first' : 'third';
+      e.currentTarget.textContent = state.walkPov === 'third' ? '視角：第三人稱' : '視角：第一人稱';
+    });
+
+    function syncLabelButtonsUI() {
+      const subBtn = document.getElementById('btn-toggle-sublabels'), hideBtn = document.getElementById('btn-hide-all-labels');
+      if (state.hideAllLabels) {
+        subBtn.textContent = '🏷️ 標籤：已全關'; hideBtn.textContent = '👁️ 顯示文字標籤';
+      } else {
+        subBtn.textContent = state.showSubLabels ? '🏷️ 全部標籤：開' : '🏷️ 僅主教室標籤'; hideBtn.textContent = '🚫 關閉所有標籤';
+      }
+    }
+    document.getElementById('btn-toggle-sublabels').addEventListener('click', () => {
+      if (state.hideAllLabels) { state.hideAllLabels = false; state.showSubLabels = true; }
+      else if (state.showSubLabels) state.showSubLabels = false;
+      else state.hideAllLabels = true;
+      syncLabelButtonsUI();
+    });
+    document.getElementById('btn-hide-all-labels').addEventListener('click', () => { state.hideAllLabels = !state.hideAllLabels; syncLabelButtonsUI(); });
+
+    document.getElementById('btn-time-of-day').addEventListener('click', e => {
+      if (state.timeOfDay === 'day') {
+        state.timeOfDay = 'sunset'; scene.background.setHex(0xfed7aa); scene.fog.color.setHex(0xfed7aa);
+        sunLight.color.setHex(0xfb923c); e.currentTarget.textContent = '🌅 溫暖夕陽';
+      } else if (state.timeOfDay === 'sunset') {
+        state.timeOfDay = 'night'; scene.background.setHex(0x0f172a); scene.fog.color.setHex(0x0f172a);
+        sunLight.color.setHex(0x93c5fd); sunLight.intensity = 0.45; e.currentTarget.textContent = '🌙 靜謐星夜';
+      } else {
+        state.timeOfDay = 'day'; scene.background.setHex(0xbae6fd); scene.fog.color.setHex(0xbae6fd);
+        sunLight.color.setHex(0xfffbeb); sunLight.intensity = 1.05; e.currentTarget.textContent = '☀️ 晴朗日間';
+      }
+    });
+
+    document.getElementById('btn-reset-camera').addEventListener('click', () => { setNavigationMode('orbit'); flyCameraTo(0, 2, 10, [-22, 34, 58]); });
+    document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+      state.sidebarOpen = !state.sidebarOpen;
+      document.getElementById('sidebar-panel').style.transform = state.sidebarOpen ? 'translateX(0)' : 'translateX(-110%)';
+    });
+
+    document.querySelectorAll('.cat-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.categoryFilter = btn.dataset.cat;
+        document.querySelectorAll('.cat-tab').forEach(b => { b.classList.toggle('ring-2', b === btn); b.classList.toggle('ring-yellow-400', b === btn); });
+        renderSidebarList();
+      });
+    });
+
+    const searchInput = document.getElementById('search-input'), clearSearchBtn = document.getElementById('btn-clear-search');
+    searchInput.addEventListener('input', e => { state.searchQuery = e.target.value; clearSearchBtn.classList.toggle('hidden', !state.searchQuery); renderSidebarList(); });
+    clearSearchBtn.addEventListener('click', () => { searchInput.value = ''; state.searchQuery = ''; clearSearchBtn.classList.add('hidden'); renderSidebarList(); });
+
+    document.getElementById('btn-teleport-here').addEventListener('click', () => selectPoi(state.selectedPoiId, true));
+    document.getElementById('btn-go-pond').addEventListener('click', () => selectPoi('eco-pond', true));
+    document.getElementById('btn-go-sunny').addEventListener('click', () => selectPoi('sp-sunnycourt', false));
+    document.getElementById('btn-go-car').addEventListener('click', () => selectPoi('gt-car-north', true));
+    document.getElementById('btn-minimap-floor').addEventListener('click', e => {
+      state.minimapFloor = state.minimapFloor === 1 ? 2 : 1;
+      e.currentTarget.textContent = `平面：${state.minimapFloor}F`;
+    });
+    document.getElementById('btn-toggle-minimap').addEventListener('click', e => {
+      state.minimapCollapsed = !state.minimapCollapsed;
+      document.getElementById('minimap-body').classList.toggle('hidden', state.minimapCollapsed);
+      e.currentTarget.textContent = state.minimapCollapsed ? '展開' : '—';
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    let prevTime = performance.now();
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((now - prevTime) / 1000, 0.1);
+      prevTime = now;
+
+      butterflies.forEach(b => {
+        const t = now * 0.001 * b.speed + b.phase;
+        b.group.position.set(b.baseX + Math.cos(t) * b.radius, b.baseY + Math.sin(t * 2.5) * 0.45, b.baseZ + Math.sin(t * 1.3) * b.radius);
+        b.group.rotation.y = -t + Math.PI / 2;
+        const flap = Math.sin(now * 0.018 + b.phase) * 0.65;
+        b.leftWing.rotation.y = flap; b.rightWing.rotation.y = -flap;
+      });
+
+      tasselRows.forEach(tr => {
+        const sway = Math.sin(now * 0.003 + tr.phase) * 0.14;
+        if (tr.axis === 'x') tr.mesh.rotation.x = sway;
+        else tr.mesh.rotation.z = sway;
+      });
+
+      const carBanner = document.getElementById('car-prompt-banner');
+      const distToCar = Math.hypot(character.x - drivableCar.x, character.z - drivableCar.z);
+      if (state.isDriving) {
+        carBanner.classList.remove('hidden');
+        document.getElementById('car-prompt-text').textContent = '🚗 正在駕駛四輪黑色轎車（WASD 行駛、F 下車）';
+        document.getElementById('btn-toggle-drive').textContent = '🚪 下車步行 (F)';
+      } else if (distToCar <= 9.5 && character.targetFloor === 1) {
+        carBanner.classList.remove('hidden');
+        document.getElementById('car-prompt-text').textContent = '🚗 靠近北側車庫四輪黑色轎車';
+        document.getElementById('btn-toggle-drive').textContent = '🔑 上車駕駛 (F)';
+      } else carBanner.classList.add('hidden');
+
+      if (state.mode === 'orbit') {
+        if (orbit.flyAnim) {
+          const p = Math.min(1, (now - orbit.flyAnim.startTime) / orbit.flyAnim.duration), ease = 1 - Math.pow(1 - p, 3);
+          orbit.target.lerpVectors(orbit.flyAnim.startTarget, orbit.flyAnim.endTarget, ease);
+          orbit.spherical.radius = orbit.flyAnim.startR + (orbit.flyAnim.endR - orbit.flyAnim.startR) * ease;
+          orbit.spherical.phi = orbit.flyAnim.startPhi + (orbit.flyAnim.endPhi - orbit.flyAnim.startPhi) * ease;
+          orbit.spherical.theta = orbit.flyAnim.startTheta + (orbit.flyAnim.endTheta - orbit.flyAnim.startTheta) * ease;
+          updateOrbitCamera();
+          if (p >= 1) orbit.flyAnim = null;
+        }
+      }
+
+      if (state.mode === 'walk') {
+        if (state.isDriving) {
+          const carMoveSpeed = (state.sprint ? 32 : 20) * dt;
+          const turnRate = 1.9 * dt;
+          let driveDir = 0;
+          if (keys.w) driveDir += 1;
+          if (keys.s) driveDir -= 1;
+          if (keys.q || keys.a) drivableCar.rotY += turnRate * (driveDir >= 0 ? 1 : -1);
+          if (keys.e || keys.d) drivableCar.rotY -= turnRate * (driveDir >= 0 ? 1 : -1);
+
+          if (driveDir !== 0) {
+            const nx = Math.max(-108, Math.min(108, drivableCar.x - Math.sin(drivableCar.rotY) * driveDir * carMoveSpeed));
+            const nz = Math.max(-68, Math.min(75, drivableCar.z - Math.cos(drivableCar.rotY) * driveDir * carMoveSpeed));
+            [drivableCar.x, drivableCar.z] = applyCorridorWallCollision(nx, nz, 1.35);
+            drivableCar.wheels.forEach(w => { w.rotation.x -= driveDir * carMoveSpeed * 1.6; });
+          }
+          drivableCar.group.position.set(drivableCar.x, drivableCar.y, drivableCar.z);
+          drivableCar.group.rotation.y = drivableCar.rotY;
+          character.x = drivableCar.x; character.z = drivableCar.z; character.rotY = drivableCar.rotY;
+
+          const desiredCamX = drivableCar.x + Math.sin(drivableCar.rotY) * 11.0;
+          const desiredCamZ = drivableCar.z + Math.cos(drivableCar.rotY) * 11.0;
+          camera.position.lerp(new THREE.Vector3(desiredCamX, drivableCar.y + 4.2, desiredCamZ), 0.22);
+          camera.lookAt(drivableCar.x, drivableCar.y + 1.2, drivableCar.z);
+        } else {
+          const moveSpeed = (state.sprint ? 21 : 11.5) * dt, turnSpeed = 2.1 * dt;
+          if (keys.q) character.rotY += turnSpeed;
+          if (keys.e) character.rotY -= turnSpeed;
+          let forwardInput = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
+          let strafeInput = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+
+          if (forwardInput !== 0 || strafeInput !== 0) {
+            const fx = -Math.sin(character.rotY), fz = -Math.cos(character.rotY);
+            const rx = Math.cos(character.rotY), rz = -Math.sin(character.rotY);
+            let nx = Math.max(-108, Math.min(108, character.x + (fx * forwardInput + rx * strafeInput) * moveSpeed));
+            let nz = Math.max(-68, Math.min(72, character.z + (fz * forwardInput + rz * strafeInput) * moveSpeed));
+            [character.x, character.z] = applyCorridorWallCollision(nx, nz, 0.45);
+            character.walkCycle += dt * (state.sprint ? 15 : 9);
+            const swing = Math.sin(character.walkCycle) * 0.55;
+            charLeftLeg.rotation.x = swing; charRightLeg.rotation.x = -swing;
+            charLeftArm.rotation.x = -swing * 0.8; charRightArm.rotation.x = swing * 0.8;
+          } else {
+            charLeftLeg.rotation.x *= 0.85; charRightLeg.rotation.x *= 0.85;
+            charLeftArm.rotation.x *= 0.85; charRightArm.rotation.x *= 0.85;
+          }
+
+          const groundY = computeGroundAndStairElevation(character.x, character.z);
+          if (!character.onGround) {
+            character.vy -= 19.6 * dt; character.y += character.vy * dt;
+            if (character.y <= groundY) { character.y = groundY; character.vy = 0; character.onGround = true; }
+          } else character.y += (groundY - character.y) * 0.35;
+
+          character.group.position.set(character.x, character.y, character.z);
+          character.group.rotation.y = character.rotY;
+
+          if (state.walkPov === 'third') {
+            character.group.visible = true;
+            camera.position.lerp(new THREE.Vector3(character.x + Math.sin(character.rotY) * 7.2, character.y + 2.85, character.z + Math.cos(character.rotY) * 7.2), 0.22);
+            camera.lookAt(character.x, character.y + 1.85, character.z);
+          } else {
+            character.group.visible = false;
+            camera.position.set(character.x, character.y + 2.15, character.z);
+            camera.lookAt(character.x - Math.sin(character.rotY) * 12, character.y + 2.08, character.z - Math.cos(character.rotY) * 12);
+          }
+        }
+      } else character.group.visible = !state.isDriving;
+
+      if (charRing) { const s = 1 + Math.sin(now * 0.005) * 0.12; charRing.scale.set(s, s, 1); }
+      update3DLabelsProjection();
+      drawMinimap();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('load', () => {
+      buildCampusScene();
+      buildCharacterAvatar();
+      init3DLabels();
+      renderSidebarList();
+      updateOrbitCamera();
+      if (!state.sidebarOpen) document.getElementById('sidebar-panel').style.transform = 'translateX(-110%)';
+      requestAnimationFrame(animate);
+    });
+  </script>
+</body>
+</html>
