@@ -2,15 +2,28 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>雲林縣林內鄉成功國小 — 3D 校園空間與教室互動導覽</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>雲林縣林內鄉成功國小 — 3D 麥塊創造版 (iPad 觸控優化)</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: 'Noto Sans TC', 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
-    #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      overscroll-behavior: none; touch-action: none;
+      font-family: 'Noto Sans TC', 'Inter', sans-serif;
+      background: #0f172a; color: #f8fafc;
+    }
+    #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; touch-action: none; }
     #labels-container { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; overflow: hidden; }
     .poi-label {
       position: absolute; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;
@@ -32,44 +45,150 @@
     ::-webkit-scrollbar-track { background: rgba(15,23,42,0.4); }
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.45); border-radius: 9999px; }
     .glass-panel { background: rgba(15,23,42,0.84); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.14); }
+
+    /* Minecraft UI Styles */
+    .mc-panel {
+      background: rgba(30, 32, 36, 0.88);
+      border: 3px solid #6b7280;
+      box-shadow: inset -3px -3px 0px #1f2937, inset 3px 3px 0px #9ca3af, 0 8px 24px rgba(0,0,0,0.65);
+    }
+    .mc-slot {
+      width: 48px; height: 48px;
+      background: rgba(55, 65, 81, 0.88);
+      border: 3px solid #374151;
+      box-shadow: inset 2px 2px 0px #1f2937, inset -2px -2px 0px #6b7280;
+      position: relative; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.08s ease;
+      touch-action: manipulation;
+    }
+    @media (min-width: 768px) {
+      .mc-slot { width: 54px; height: 54px; }
+    }
+    .mc-slot.active-slot {
+      border-color: #f8fafc;
+      outline: 3px solid #facc15;
+      background: rgba(107, 114, 128, 0.95);
+      transform: translateY(-3px) scale(1.06);
+      z-index: 5;
+      box-shadow: 0 0 14px rgba(250, 204, 21, 0.75), inset 2px 2px 0px #374151;
+    }
+    .mc-slot canvas, .mc-slot img {
+      width: 34px; height: 34px;
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
+    @media (min-width: 768px) {
+      .mc-slot canvas, .mc-slot img { width: 38px; height: 38px; }
+    }
+    .mc-dpad-btn {
+      background: rgba(255, 255, 255, 0.18);
+      border: 2.5px solid rgba(255, 255, 255, 0.48);
+      box-shadow: inset 0 2px 0 rgba(255,255,255,0.28), 0 4px 12px rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      color: #ffffff;
+      font-weight: 900;
+      border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      touch-action: none;
+      transition: background 0.08s, transform 0.08s;
+    }
+    .mc-dpad-btn.pressed, .mc-dpad-btn:active {
+      background: rgba(250, 204, 21, 0.55);
+      border-color: #fef08a;
+      transform: scale(0.94);
+    }
+    .mc-action-btn {
+      background: rgba(30, 41, 59, 0.78);
+      border: 2.5px solid rgba(255, 255, 255, 0.55);
+      box-shadow: inset 0 2px 0 rgba(255,255,255,0.25), 0 6px 16px rgba(0,0,0,0.5);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #ffffff;
+      font-weight: 900;
+      border-radius: 18px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      touch-action: none;
+      transition: transform 0.08s, background 0.08s;
+    }
+    .mc-action-btn:active, .mc-action-btn.pressed {
+      transform: scale(0.92);
+      filter: brightness(1.2);
+    }
+    /* Crosshair */
+    #mc-crosshair {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 28px; height: 28px; pointer-events: none; z-index: 15;
+    }
+    #mc-crosshair::before, #mc-crosshair::after {
+      content: ''; position: absolute; background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 0 4px rgba(0,0,0,0.9);
+    }
+    #mc-crosshair::before { left: 12px; top: 2px; width: 4px; height: 24px; }
+    #mc-crosshair::after { top: 12px; left: 2px; height: 4px; width: 24px; }
+    /* Touch Hold Break Progress Circle (iPad Minecraft style) */
+    #mc-touch-ring {
+      position: fixed; width: 74px; height: 74px; border-radius: 50%;
+      border: 5px solid rgba(255,255,255,0.85);
+      background: rgba(239, 68, 68, 0.28);
+      box-shadow: 0 0 18px rgba(0,0,0,0.65);
+      transform: translate(-50%, -50%) scale(0);
+      pointer-events: none; z-index: 45;
+      transition: transform 0.08s linear;
+    }
   </style>
 </head>
 <body class="relative w-full h-full overflow-hidden select-none">
   <div id="canvas-container"></div>
   <div id="labels-container"></div>
 
-  <header class="fixed top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-    <div class="glass-panel pointer-events-auto rounded-2xl px-3.5 py-2 flex items-center gap-3 shadow-xl">
-      <button id="btn-toggle-sidebar" class="p-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 transition" title="展開/收合清單">
+  <!-- 麥塊中央十字準星與長按挖掘光圈 -->
+  <div id="mc-crosshair"></div>
+  <div id="mc-touch-ring"></div>
+
+  <!-- 頂部導覽與麥塊控制列 (單行不換行配置，與漢堡選單維持同一列) -->
+  <header class="fixed top-2.5 left-2.5 right-2.5 z-30 flex flex-nowrap items-center justify-between gap-1.5 pointer-events-none">
+    <div id="header-brand-box" class="glass-panel pointer-events-auto rounded-2xl px-3 py-1.5 flex items-center gap-2.5 shadow-xl transition-all shrink-0">
+      <button id="btn-toggle-sidebar" class="p-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 transition shrink-0" title="展開/收合空間清單">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <div>
+      <div id="header-title-content" class="whitespace-nowrap">
         <div class="flex items-center gap-2">
           <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white">雲林縣林內鄉成功國小 3D 校園導覽</h1>
+          <h1 class="text-xs sm:text-sm font-extrabold tracking-tight text-white">成功國小 3D 麥塊創造校園</h1>
+          <span id="mc-block-count-badge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/25 border border-amber-400/50 text-amber-300">🧱 0 方塊</span>
         </div>
-        <p id="status-subtitle" class="text-[11px] text-slate-300 hidden sm:block">已恢復晴天球場與各車棚立柱｜四輪黑色轎車｜原版中庭花園與自然疊石生態池</p>
+        <p id="status-subtitle" class="text-[10px] text-slate-300 hidden 2xl:block">支援 iPad 麥塊觸控搖桿、飛行建造、27種像素方塊、本地自動儲存與 JSON 匯出匯入</p>
       </div>
     </div>
 
-    <div class="glass-panel pointer-events-auto rounded-2xl p-1.5 flex flex-wrap items-center gap-1.5 shadow-xl">
-      <div class="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-slate-700/70">
-        <button id="mode-orbit-btn" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow"><span>🦅</span><span>自由查看設施</span></button>
-        <button id="mode-walk-btn" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white"><span>🚶</span><span>人物自由走動</span></button>
+    <div class="glass-panel pointer-events-auto rounded-2xl p-1 flex flex-nowrap items-center gap-1 shadow-xl overflow-x-auto max-w-full whitespace-nowrap">
+      <div class="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-slate-700/70 shrink-0">
+        <button id="mode-orbit-btn" class="px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 text-slate-300 hover:text-white whitespace-nowrap"><span>🦅</span><span>查看設施</span></button>
+        <button id="mode-walk-btn" class="px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 text-slate-300 hover:text-white whitespace-nowrap"><span>🚶</span><span>自由走動</span></button>
+        <button id="mode-mc-btn" class="px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 bg-emerald-600 text-white shadow whitespace-nowrap"><span>⛏️</span><span>麥塊建造</span></button>
       </div>
-      <button id="btn-walk-pov" class="hidden px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 border border-amber-400/50 text-amber-200 hover:bg-amber-500/30 transition">視角：第三人稱</button>
-      <button id="btn-toggle-sublabels" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition">🏷️ 全部標籤：開</button>
-      <button id="btn-hide-all-labels" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-900/70 hover:bg-rose-700 text-rose-100 border border-rose-500/50 transition">🚫 關閉所有標籤</button>
-      <button id="btn-time-of-day" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-600/60 transition">☀️ 晴朗日間</button>
-      <button id="btn-reset-camera" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition">🔄 全景</button>
+      <button id="btn-mc-control-scheme" class="px-2 py-1 rounded-xl text-[11px] font-extrabold bg-amber-500 text-slate-950 border border-amber-300 shadow transition shrink-0 whitespace-nowrap" title="手動切換顯示 iPad 虛擬十字鍵 或 PC 鍵盤模式">📱 觸控十字鍵:開</button>
+      <button id="btn-top-fly-toggle" class="px-2 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800 hover:bg-slate-700 border border-sky-400/60 text-sky-300 shadow transition shrink-0 whitespace-nowrap" title="開啟或關閉麥塊創造飛行模式 (G)">🕊️ 飛行:關</button>
+      <button id="btn-walk-pov" class="px-2 py-1 rounded-xl text-[11px] font-bold bg-amber-500/25 border border-amber-400/60 text-amber-200 hover:bg-amber-500/35 transition shrink-0 whitespace-nowrap">👁️ 第一人稱</button>
+      <button id="btn-touch-aim-mode" class="px-2 py-1 rounded-xl text-[11px] font-bold bg-sky-600/30 border border-sky-400/60 text-sky-200 hover:bg-sky-600/45 transition shrink-0 whitespace-nowrap" title="切換準星瞄準或直接點選畫面方塊">🎯 準星</button>
+      <button id="btn-mc-undo" class="px-2 py-1 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition shrink-0 whitespace-nowrap" title="復原上一步方塊操作 (Ctrl+Z)">↩️ 復原</button>
+      <button id="btn-toggle-sublabels" class="px-2 py-1 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition hidden sm:inline-flex shrink-0 whitespace-nowrap">🏷️ 標籤:主</button>
+      <button id="btn-time-of-day" class="px-2 py-1 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-600/60 transition shrink-0">☀️</button>
+      <button id="btn-sound-toggle" class="px-2 py-1 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-600/60 transition shrink-0" title="開關方塊音效">🔊</button>
     </div>
   </header>
 
-  <aside id="sidebar-panel" class="fixed top-20 left-3 bottom-3 w-72 sm:w-80 z-20 glass-panel rounded-2xl flex flex-col shadow-2xl transition-transform duration-300">
+  <!-- 左側空間導覽清單 (預設收合，點擊左上角按鈕展開) -->
+  <aside id="sidebar-panel" class="fixed top-16 left-3 bottom-24 w-72 sm:w-80 z-30 glass-panel rounded-2xl flex flex-col shadow-2xl transition-transform duration-300" style="transform: translateX(-115%);">
     <div class="p-3 border-b border-slate-700/70 space-y-2">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">校園空間與教室清單</span>
-        <span id="poi-count-badge" class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">47 個空間</span>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">校園空間與快速傳送</span>
+        <div class="flex items-center gap-1.5">
+          <span id="poi-count-badge" class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">47 個空間</span>
+          <button id="btn-close-sidebar" class="text-xs px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white">✕</button>
+        </div>
       </div>
       <div class="relative">
         <input id="search-input" type="text" placeholder="搜尋教室、晴天球場、生態池、車庫..." class="w-full bg-slate-900/90 text-xs text-white placeholder-slate-400 rounded-xl pl-8 pr-7 py-2 border border-slate-700 focus:outline-none focus:border-indigo-400" />
@@ -88,7 +207,7 @@
     <div id="poi-list" class="flex-1 overflow-y-auto p-2.5 space-y-1.5"></div>
     <div class="p-2.5 border-t border-slate-700/70 bg-slate-900/70 rounded-b-2xl space-y-1.5">
       <div class="flex items-center justify-between text-[11px] text-slate-300">
-        <span>快速傳送體驗</span>
+        <span>快速傳送建造點</span>
         <span id="char-floor-indicator" class="px-2 py-0.5 rounded bg-slate-700 text-amber-300 font-bold">位置：1F 中庭生態池</span>
       </div>
       <div class="grid grid-cols-3 gap-1">
@@ -96,55 +215,343 @@
         <button id="btn-go-sunny" class="px-1.5 py-1.5 rounded-xl text-[11px] font-bold bg-sky-700/85 hover:bg-sky-600 text-white transition flex items-center justify-center gap-1"><span>🏀</span><span>晴天球場</span></button>
         <button id="btn-go-car" class="px-1.5 py-1.5 rounded-xl text-[11px] font-bold bg-amber-600/90 hover:bg-amber-500 text-white transition flex items-center justify-center gap-1"><span>🚗</span><span>後車庫黑車</span></button>
       </div>
+      <div class="flex items-center gap-1 pt-1">
+        <button id="btn-hide-all-labels" class="flex-1 py-1.5 rounded-xl text-[11px] font-bold bg-rose-900/70 hover:bg-rose-700 text-rose-100 border border-rose-500/50 transition">🚫 開關所有標籤</button>
+        <button id="btn-reset-camera" class="flex-1 py-1.5 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition">🔄 鳥瞰全景</button>
+      </div>
     </div>
   </aside>
 
-  <div id="minimap-panel" class="fixed top-20 right-3 z-20 glass-panel rounded-2xl p-2.5 shadow-2xl w-60 sm:w-64 transition-all">
-    <div class="flex items-center justify-between mb-1.5">
-      <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-xs font-bold text-slate-200">校園平面雷達圖</span></div>
+  <!-- 右上角雷達小地圖 -->
+  <div id="minimap-panel" class="fixed top-16 right-2.5 z-20 glass-panel rounded-2xl p-2 shadow-2xl w-48 sm:w-56 transition-all">
+    <div class="flex items-center justify-between mb-1">
+      <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-[11px] font-bold text-slate-200">校園雷達 (點擊傳送)</span></div>
       <div class="flex items-center gap-1">
-        <button id="btn-minimap-floor" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-white font-bold hover:bg-slate-600 transition">平面：1F</button>
+        <button id="btn-minimap-floor" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-white font-bold hover:bg-slate-600 transition">1F</button>
         <button id="btn-toggle-minimap" class="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white">—</button>
       </div>
     </div>
     <div id="minimap-body">
       <canvas id="minimap-canvas" width="240" height="175" class="w-full h-auto rounded-xl border border-slate-700 cursor-crosshair bg-slate-900"></canvas>
-      <div class="mt-1.5 flex items-center justify-between text-[10px] text-slate-400"><span>⬅️ 往林內市區</span><span>坪頂路</span><span>往坪頂社區 ➡️</span></div>
+      <div class="mt-1 flex items-center justify-between text-[9px] text-slate-400"><span>⬅️ 林內市區</span><span>坪頂路</span><span>坪頂社區 ➡️</span></div>
     </div>
   </div>
 
-  <div id="car-prompt-banner" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-2xl px-4 py-2 border border-amber-400/60 shadow-2xl flex items-center gap-3 pointer-events-auto">
+  <!-- 靠近北側車庫轎車提示橫幅 -->
+  <div id="car-prompt-banner" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-30 glass-panel rounded-2xl px-4 py-2 border border-amber-400/60 shadow-2xl flex items-center gap-3 pointer-events-auto">
     <span id="car-prompt-text" class="text-xs sm:text-sm font-extrabold text-amber-300">🚗 靠近北側車庫四輪黑色轎車</span>
     <button id="btn-toggle-drive" class="px-3 py-1 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow">🔑 上車駕駛 (F)</button>
   </div>
 
-  <div id="selected-banner" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 glass-panel rounded-2xl px-4 py-2.5 shadow-2xl flex items-center gap-3 max-w-xl w-[92%] sm:w-auto pointer-events-auto transition-all">
+  <!-- 原版底部選取空間資訊橫幅 (在「自由查看設施」與「人物自由走動」模式顯示) -->
+  <div id="selected-banner" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-20 glass-panel rounded-2xl px-4 py-2.5 shadow-2xl flex items-center gap-3 max-w-xl w-[92%] sm:w-auto pointer-events-auto transition-all">
     <div id="selected-badge" class="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-600 text-white shrink-0">中庭花園 & 生態池</div>
     <div class="min-w-0 flex-1">
-      <div id="selected-title" class="text-xs sm:text-sm font-bold text-white truncate">中庭花園、自然疊石生態池、晴天球場與北側車庫黑色轎車</div>
-      <div id="selected-Zone" class="text-[11px] text-slate-300 truncate">已完整恢復晴天球場與車庫立柱、黑色四輪轎車、以及原版中庭花園與生態池</div>
+      <div id="selected-title" class="text-xs sm:text-sm font-bold text-white truncate">中庭花園、自然疊石生態池與自訂麥塊建築</div>
+      <div id="selected-Zone" class="text-[11px] text-slate-300 truncate">目前顯示自訂麥塊地圖｜可自由走動、跳躍與至北側車庫開黑色轎車</div>
     </div>
     <button id="btn-teleport-here" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition shadow">📍 傳送人物至此</button>
+    <button id="btn-close-selected-banner" class="text-slate-400 hover:text-white text-xs px-1">✕</button>
   </div>
 
-  <div id="walk-hud" class="hidden fixed bottom-20 right-3 z-20 glass-panel rounded-2xl p-3 shadow-2xl w-56">
+  <!-- 原版「人物自由走動」專屬控制面板 (僅在「🚶 人物自由走動」模式顯示，不包含麥塊建造介面) -->
+  <div id="walk-hud" class="hidden fixed bottom-20 right-3 z-20 glass-panel rounded-2xl p-3 shadow-2xl w-56 pointer-events-auto">
     <div class="flex items-center justify-between mb-2">
-      <span id="hud-mode-title" class="text-xs font-bold text-amber-300 flex items-center gap-1">🎮 人物走動控制</span>
+      <span id="walk-hud-mode-title" class="text-xs font-bold text-amber-300 flex items-center gap-1">🎮 人物走動控制</span>
       <span class="text-[10px] text-slate-400">WASD / 方向鍵</span>
     </div>
     <div class="grid grid-cols-3 gap-1.5 text-center">
-      <button id="pad-q" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-slate-300">↺ 左轉</button>
-      <button id="pad-w" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-sm font-extrabold text-white">▲ 前進</button>
-      <button id="pad-e" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-slate-300">右轉 ↻</button>
-      <button id="pad-a" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-white">◀ 左移</button>
-      <button id="pad-s" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-sm font-extrabold text-white">▼ 後退</button>
-      <button id="pad-d" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-white">右移 ▶</button>
+      <button id="walk-pad-q" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-slate-300">↺ 左轉</button>
+      <button id="walk-pad-w" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-sm font-extrabold text-white">▲ 前進</button>
+      <button id="walk-pad-e" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-slate-300">右轉 ↻</button>
+      <button id="walk-pad-a" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-white">◀ 左移</button>
+      <button id="walk-pad-s" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-sm font-extrabold text-white">▼ 後退</button>
+      <button id="walk-pad-d" class="py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:bg-indigo-600 text-xs font-bold text-white">右移 ▶</button>
     </div>
     <div class="grid grid-cols-2 gap-1.5 mt-2">
-      <button id="pad-jump" class="py-1.5 rounded-xl bg-amber-600/80 hover:bg-amber-500 text-xs font-bold text-white">⏫ 跳躍 (Space)</button>
-      <button id="pad-sprint" class="py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-xs font-bold text-white">⚡ 跑步：關</button>
+      <button id="walk-pad-jump" class="py-1.5 rounded-xl bg-amber-600/80 hover:bg-amber-500 text-xs font-bold text-white">⏫ 跳躍 (Space)</button>
+      <button id="walk-pad-sprint" class="py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-xs font-bold text-white">⚡ 跑步：關</button>
     </div>
-    <p class="mt-2 text-[10px] text-slate-300 leading-snug">💡 人物身穿淡紫蝴蝶上衣；靠近北側車庫黑色轎車可按 <b>F</b> 鍵開車！</p>
+    <p class="mt-2 text-[10px] text-slate-300 leading-snug">💡 此模式僅供自由走動與開車（靠近北側車庫黑車按 <b>F</b> 鍵），並完整呈現您建立的自訂地圖！</p>
+  </div>
+
+  <!-- ================= 畫面左下角：獨立「存檔及操作說明」工具列區塊 (預設為收合，可手動展開) ================= -->
+  <div id="bottom-left-toolbar" class="fixed bottom-3 left-3 z-40 pointer-events-auto" style="z-index: 40;">
+    <!-- 展開後的工具列與操作速覽面板 (預設 hidden 收合) -->
+    <div id="bl-toolbar-panel" class="hidden mb-2 glass-panel rounded-2xl p-3 shadow-2xl w-72 sm:w-80 border border-amber-400/50 space-y-2.5">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+        <span class="text-xs font-extrabold text-amber-300 flex items-center gap-1.5">🧰 存檔與操作說明工具列</span>
+        <button id="btn-close-bl-toolbar" class="text-xs px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-bold">▼ 收合</button>
+      </div>
+
+      <!-- 核心功能按鈕：存檔/匯出匯入 & 完整操作說明 & 切換顯示虛擬十字鍵 -->
+      <div class="grid grid-cols-2 gap-1.5">
+        <button id="btn-open-save-modal" class="py-2 px-2.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/60 shadow transition flex items-center justify-center gap-1">
+          <span>💾</span><span>存檔 / 匯出匯入</span>
+        </button>
+        <button id="btn-open-help-modal" class="py-2 px-2.5 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 shadow transition flex items-center justify-center gap-1">
+          <span>❓</span><span>完整操作說明</span>
+        </button>
+      </div>
+      <button id="btn-toolbar-scheme-toggle" class="w-full py-1.5 px-2.5 rounded-xl text-xs font-extrabold bg-emerald-600/80 hover:bg-emerald-500 text-white border border-emerald-300/50 shadow transition flex items-center justify-center gap-1">
+        📱 點此切換：顯示 iPad 虛擬十字鍵 / PC 鍵盤模式
+      </button>
+
+      <!-- 內嵌 iPad 觸控 / PC 鍵盤快速操作說明頁籤 -->
+      <div class="pt-1 border-t border-slate-700/80">
+        <div class="flex items-center justify-between gap-1.5 mb-1.5">
+          <div class="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-slate-700">
+            <button id="hud-tab-touch" class="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500 text-slate-950 transition">📱 iPad 觸控說明</button>
+            <button id="hud-tab-pc" class="px-2 py-0.5 rounded-md text-[11px] font-extrabold text-slate-300 hover:text-white transition">💻 PC 鍵盤說明</button>
+          </div>
+          <button id="btn-hud-open-full-help" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200 hover:bg-amber-500/50 font-bold">大視窗</button>
+        </div>
+        <div id="mc-touch-hud-body">
+          <!-- iPad 觸控操作速覽內容 -->
+          <div id="mc-hud-touch-content" class="text-[11px] text-slate-200 space-y-1 leading-snug">
+            <div>🕹️ <b>左手十字鍵</b>：按住或滑動移動；點上方 <span class="text-sky-300 font-bold">🕊️飛行</span>（或連點兩下中央鍵）可升空飛行。</div>
+            <div>👆 <b>單指滑動畫面</b>：轉動視角，對準主角<b>正前方近距離黑框</b>。</div>
+            <div>🧱 <b>放置方塊</b>：按右下 <span class="text-emerald-300 font-bold">🧱放置</span> 或<b>輕點畫面</b>。</div>
+            <div>⛏️ <b>挖掘破壞</b>：按右下 <span class="text-rose-300 font-bold">⛏️挖掘</span> 或<b>長按畫面 0.4 秒</b>。</div>
+          </div>
+          <!-- PC 鍵盤操作速覽內容 -->
+          <div id="mc-hud-pc-content" class="hidden text-[11px] text-slate-200 space-y-1 leading-snug">
+            <div>⌨️ <b>移動與轉向</b>：<code class="text-yellow-300 font-bold">W A S D</code> 走位、<code class="text-yellow-300 font-bold">Q / E</code> 或 <code class="text-yellow-300 font-bold">← →</code> 左右轉、<code class="text-yellow-300 font-bold">↑ ↓</code> 上下看。</div>
+            <div>🧱 <b>放置 / 挖掘</b>：按 <code class="text-emerald-300 font-bold">R / Enter / 左鍵</code> 放置；按 <code class="text-rose-300 font-bold">X / Delete / 右鍵</code> 挖掘。</div>
+            <div>🕊️ <b>跳躍与飛行</b>：<code class="text-sky-300 font-bold">空白鍵</code> 跳躍；按 <code class="text-sky-300 font-bold">G</code> 飛行（<code class="text-sky-300">空白鍵</code>上升 / <code class="text-sky-300">C</code>下降）。</div>
+            <div>🎒 <b>方塊與視角</b>：<code class="text-amber-300 font-bold">1~9 / 滾輪</code> 選方塊、<code class="text-amber-300 font-bold">B</code> 開背包、<code class="text-amber-300 font-bold">V</code> 切換視角。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 預設收合的左下角工具列展開按鈕 -->
+    <button id="btn-toggle-bl-toolbar" class="glass-panel px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold text-amber-300 hover:text-white border border-amber-400/60 shadow-xl flex items-center gap-1.5 transition">
+      <span>🧰</span>
+      <span id="bl-toolbar-btn-text">存檔 / 操作說明 ▲</span>
+    </button>
+  </div>
+
+  <!-- ================= iPad 麥塊版左側虛擬十字移動控制盤與飛行鈕 (D-Pad，位於左方上下置中位置) ================= -->
+  <div id="mc-dpad-panel" class="fixed left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 select-none pointer-events-auto" style="z-index: 30;">
+    <div class="mb-1.5 flex items-center gap-1.5">
+      <button id="pad-fly-toggle" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-900/90 border-2 border-sky-400/80 text-sky-300 shadow-lg backdrop-blur">🕊️ 飛行：關</button>
+      <button id="pad-sprint" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-900/90 border-2 border-amber-400/80 text-amber-300 shadow-lg backdrop-blur">⚡ 跑步：關</button>
+      <span id="hud-mode-title" class="hidden sm:inline-block text-[10px] font-bold text-slate-300 bg-slate-900/70 px-2 py-0.5 rounded-lg">🕹️ 搖桿移動</span>
+    </div>
+    <div id="mc-dpad-grid" class="grid grid-cols-3 gap-1.5 w-40 h-40 sm:w-44 sm:h-44 p-1.5 rounded-2xl bg-slate-950/55 border-2 border-white/25 shadow-2xl backdrop-blur-sm">
+      <button data-dpad="wa" class="mc-dpad-btn text-xs opacity-80">↖</button>
+      <button id="pad-w" data-dpad="w" class="mc-dpad-btn text-base sm:text-lg">▲<span class="text-[9px] font-bold opacity-80">前進</span></button>
+      <button data-dpad="wd" class="mc-dpad-btn text-xs opacity-80">↗</button>
+      <button id="pad-a" data-dpad="a" class="mc-dpad-btn text-base sm:text-lg">◀<span class="text-[9px] font-bold opacity-80">左移</span></button>
+      <button id="pad-center-jump" class="mc-dpad-btn bg-amber-500/45 border-amber-300/80 text-xs">⏫<span class="text-[9px] font-extrabold">跳躍/飛</span></button>
+      <button id="pad-d" data-dpad="d" class="mc-dpad-btn text-base sm:text-lg">▶<span class="text-[9px] font-bold opacity-80">右移</span></button>
+      <button id="pad-q" data-dpad="q" class="mc-dpad-btn text-xs">↺<span class="text-[9px] opacity-80">左轉</span></button>
+      <button id="pad-s" data-dpad="s" class="mc-dpad-btn text-base sm:text-lg">▼<span class="text-[9px] font-bold opacity-80">後退</span></button>
+      <button id="pad-e" data-dpad="e" class="mc-dpad-btn text-xs">↻<span class="text-[9px] opacity-80">右轉</span></button>
+    </div>
+  </div>
+
+  <!-- ================= 底部中央麥塊 9 格快捷欄 (Hotbar) ================= -->
+  <div id="mc-hotbar-wrapper" class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-auto" style="z-index: 30;">
+    <!-- 當前手持方塊提示與觸控工具切換 -->
+    <div class="mb-1.5 flex items-center gap-2">
+      <div id="mc-item-tooltip" class="px-3 py-0.5 rounded-full bg-slate-950/85 border border-slate-600/80 text-xs font-extrabold text-amber-300 shadow-lg backdrop-blur">
+        草地方塊 (Grass Block)
+      </div>
+      <button id="btn-touch-tool-toggle" class="px-2.5 py-0.5 rounded-full bg-emerald-600/90 border border-emerald-300/80 text-[11px] font-extrabold text-white shadow-lg" title="在直接點選模式下，切換點擊畫面是建造或挖掘">
+        點擊畫面：🧱 放置
+      </button>
+    </div>
+
+    <!-- 9格快捷欄 + 背包展開鈕 -->
+    <div class="mc-panel p-1 rounded-xl flex items-center gap-1">
+      <div id="mc-hotbar-slots" class="flex items-center gap-1"></div>
+      <button id="btn-open-inventory" class="mc-slot !bg-indigo-900/90 !border-indigo-400 text-white font-black text-base flex flex-col items-center justify-center" title="打開全部方塊背包 (B)">
+        <span>⋯</span>
+        <span class="text-[9px] text-indigo-200">方塊庫</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= iPad 麥塊版右側動作與升降按鈕群 ================= -->
+  <div id="mc-action-panel" class="fixed bottom-4 right-3 sm:right-5 z-30 flex flex-col items-end gap-2 select-none pointer-events-auto" style="z-index: 30;">
+    <!-- 飛行升降與跳躍按鈕 -->
+    <div class="flex items-center gap-1.5">
+      <button id="pad-fly-up" class="mc-action-btn w-14 h-12 sm:w-16 sm:h-14 !bg-sky-600/75 !border-sky-300 shadow-lg">
+        <span class="text-base">🔼</span>
+        <span class="text-[10px]">上升/跳</span>
+      </button>
+      <button id="pad-fly-down" class="mc-action-btn w-14 h-12 sm:w-16 sm:h-14 !bg-slate-700/85 !border-slate-300 shadow-lg">
+        <span class="text-base">🔽</span>
+        <span class="text-[10px]">下降</span>
+      </button>
+    </div>
+    <!-- 核心麥塊破壞與放置大按鈕 (專為 iPad 右手大拇指設計) -->
+    <div class="flex items-center gap-2">
+      <button id="btn-mc-break" class="mc-action-btn w-16 h-16 sm:w-20 sm:h-20 !bg-rose-600/85 !border-rose-300 shadow-xl">
+        <span class="text-xl sm:text-2xl">⛏️</span>
+        <span class="text-[11px] sm:text-xs font-black">挖掘破壞</span>
+      </button>
+      <button id="btn-mc-place" class="mc-action-btn w-20 h-20 sm:w-24 sm:h-24 !bg-emerald-600/90 !border-emerald-300 shadow-2xl">
+        <span class="text-2xl sm:text-3xl">🧱</span>
+        <span class="text-xs sm:text-sm font-black">放置方塊</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= PC 鍵盤模式專用精簡狀態與快捷操作列 (在 PC 鍵盤模式下取代大型觸控搖桿) ================= -->
+  <div id="mc-pc-status-bar" class="hidden fixed bottom-14 left-3 z-30 glass-panel rounded-2xl px-3 py-2 shadow-xl flex flex-wrap items-center gap-2 pointer-events-auto border border-emerald-400/40" style="z-index: 30;">
+    <span class="text-[11px] font-extrabold text-emerald-300">💻 PC 鍵盤模式</span>
+    <button id="pc-btn-fly-toggle" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 transition">🕊️ 飛行(G)：關</button>
+    <button id="pc-btn-sprint-toggle" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 transition">⚡ 跑步(Shift)：關</button>
+    <button id="pc-btn-place" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow transition">🧱 放置 (R / 左鍵)</button>
+    <button id="pc-btn-break" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition">⛏️ 挖掘 (X / 右鍵)</button>
+  </div>
+
+  <!-- ================= 麥塊全部方塊背包視窗 (Inventory Modal) ================= -->
+  <div id="mc-inventory-modal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
+    <div class="mc-panel w-full max-w-2xl rounded-2xl p-4 sm:p-5 text-white max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-600">
+        <div>
+          <h2 class="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2">🎒 麥塊創造模式方塊背包 (點擊方塊放入目前快捷欄)</h2>
+          <p class="text-xs text-slate-300 mt-0.5">目前選取快捷欄第 <span id="inv-target-slot-num" class="font-bold text-yellow-300">1</span> 格 — 點擊下方任一方塊即可裝備使用</p>
+        </div>
+        <button id="btn-close-inventory" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-extrabold">✕ 關閉 (E)</button>
+      </div>
+      <div id="mc-inventory-grid" class="flex-1 overflow-y-auto py-4 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-2.5"></div>
+    </div>
+  </div>
+
+  <!-- ================= 本地儲存、匯出與匯入管理視窗 (Save / Load / Export / Import Modal) ================= -->
+  <div id="mc-save-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
+    <div class="mc-panel w-full max-w-2xl rounded-2xl p-4 sm:p-6 text-white max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-600">
+        <div>
+          <h2 class="text-base sm:text-lg font-black text-emerald-300 flex items-center gap-2">💾 麥塊校園建築 — 本地儲存、匯出與匯入管理</h2>
+          <p id="save-modal-status" class="text-xs text-slate-300 mt-0.5">每次放置或挖掘方塊皆會自動儲存於瀏覽器本地空間 (LocalStorage)</p>
+        </div>
+        <button id="btn-close-save-modal" class="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-extrabold">✕ 關閉</button>
+      </div>
+
+      <!-- 本地三組存檔槽 (適合 iPad 多位同學或多個作品切換) -->
+      <div class="space-y-2">
+        <div class="text-xs font-extrabold uppercase tracking-wider text-amber-300">📦 iPad / 瀏覽器本地記憶槽 (Local Save Slots)</div>
+        <div id="mc-save-slots-list" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5"></div>
+      </div>
+
+      <!-- 匯出與匯入檔案區 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-700">
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2.5">
+          <div class="text-xs font-extrabold text-sky-300 flex items-center gap-1.5">📤 匯出麥塊建築作品 (Export)</div>
+          <p class="text-[11px] text-slate-300 leading-relaxed">將目前地圖上建造的所有方塊匯出為 <code class="text-amber-300">.json</code> 檔案，或複製存檔文字碼分享給其他 iPad 與電腦。</p>
+          <div class="flex flex-wrap gap-2">
+            <button id="btn-export-json-file" class="flex-1 py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-extrabold text-white shadow">⬇️ 下載 JSON 存檔</button>
+            <button id="btn-copy-json-text" class="flex-1 py-2 px-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-extrabold text-slate-100">📋 複製存檔文字碼</button>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2.5">
+          <div class="text-xs font-extrabold text-emerald-300 flex items-center gap-1.5">📥 匯入麥塊建築作品 (Import)</div>
+          <p class="text-[11px] text-slate-300 leading-relaxed">讀取先前匯出的 <code class="text-amber-300">.json</code> 存檔，可選擇「覆蓋目前方塊」或「合併進目前校園」。</p>
+          <div class="flex items-center gap-2 text-xs">
+            <label class="flex items-center gap-1 cursor-pointer">
+              <input type="radio" name="import-mode" value="replace" checked class="accent-emerald-500" />
+              <span>覆蓋目前方塊</span>
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer">
+              <input type="radio" name="import-mode" value="merge" class="accent-emerald-500" />
+              <span>合併保留現有</span>
+            </label>
+          </div>
+          <input id="input-import-json-file" type="file" accept=".json,application/json" class="hidden" />
+          <button id="btn-trigger-import-file" class="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-extrabold text-white shadow">📂 選擇 JSON 檔案匯入</button>
+        </div>
+      </div>
+
+      <!-- 文字碼貼上匯入與匯出預覽框 -->
+      <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-purple-300">📝 存檔 JSON 文字碼 (可貼上代碼直接匯入，適合 iPad 跨裝置拷貝)</span>
+          <button id="btn-import-from-textarea" class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-xs font-extrabold text-white shadow">✨ 從下方文字框匯入</button>
+        </div>
+        <textarea id="mc-json-textarea" rows="3" placeholder="在此貼上匯出的 JSON 存檔文字碼，再按右上角「從下方文字框匯入」..." class="w-full rounded-xl bg-slate-950 border border-slate-700 p-2.5 text-[11px] font-mono text-emerald-300 focus:outline-none focus:border-purple-400 select-text" style="-webkit-user-select: text; user-select: text;"></textarea>
+      </div>
+
+      <!-- 示範建築與清空工具 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700">
+        <button id="btn-load-demo-build" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-xs font-extrabold text-white shadow flex items-center gap-1.5">
+          <span>🏰</span><span>載入「成功國小紫蝶麥塊城堡與樹屋」示範作品</span>
+        </button>
+        <button id="btn-clear-all-blocks" class="px-3.5 py-2 rounded-xl bg-rose-700 hover:bg-rose-600 text-xs font-extrabold text-white shadow flex items-center gap-1.5">
+          <span>🗑️</span><span>清空所有自建方塊</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PC 鍵盤滑鼠與 iPad 觸控完整操作說明視窗 (Controls Help Modal) ================= -->
+  <div id="mc-help-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
+    <div class="mc-panel w-full max-w-3xl rounded-2xl p-4 sm:p-6 text-white max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-600">
+        <div>
+          <h2 class="text-base sm:text-lg font-black text-amber-300 flex items-center gap-2">💻 PC 電腦鍵盤滑鼠 ＆ 📱 iPad 平板觸控 完整操作說明</h2>
+          <p class="text-xs text-slate-300 mt-0.5">點擊頂部導覽列「💻 操作：PC 鍵盤 / 📱 操作：iPad 觸控」可隨時切換介面佈局，且電腦鍵盤熱鍵全程皆可直接使用！</p>
+        </div>
+        <button id="btn-close-help-modal" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shrink-0">✕ 開始遊玩</button>
+      </div>
+
+      <!-- PC 電腦鍵盤與滑鼠專屬說明區塊 -->
+      <div class="p-4 rounded-2xl bg-emerald-950/40 border-2 border-emerald-500/60 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="font-black text-emerald-300 text-sm sm:text-base flex items-center gap-2">💻 一、PC 電腦鍵盤與滑鼠操作說明（麥塊建造模式）</div>
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-200 border border-emerald-400/40">支援純鍵盤或鍵鼠雙重操作</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-700 space-y-1.5">
+            <div class="font-extrabold text-amber-300">🏃 1. 人物移動、跳躍與創造飛行</div>
+            <ul class="space-y-1 text-slate-200 leading-relaxed list-disc pl-4">
+              <li><b>前後左右移動</b>：<code class="text-yellow-300 font-bold">W</code> 前進、<code class="text-yellow-300 font-bold">S</code> 後退、<code class="text-yellow-300 font-bold">A</code> 左移、<code class="text-yellow-300 font-bold">D</code> 右移。</li>
+              <li><b>左右轉向與上下視角</b>：<code class="text-yellow-300 font-bold">Q / E</code> 或 <code class="text-yellow-300 font-bold">← / →</code> 左右轉向；<code class="text-yellow-300 font-bold">↑ / ↓ 上下方向鍵</code> 抬頭/低頭調整黑框高度，或用<b>滑鼠按住拖曳畫面</b>自由轉動視角。</li>
+              <li><b>跳躍與創造飛行</b>：按 <code class="text-sky-300 font-bold">Space (空白鍵)</code> 跳躍；按 <code class="text-sky-300 font-bold">G</code> 鍵或<b>連按兩下空白鍵</b>開啟/關閉「🕊️ 創造飛行」。</li>
+              <li><b>飛行升降與加速</b>：飛行時按住 <code class="text-sky-300 font-bold">空白鍵</code> 上升、按住 <code class="text-sky-300 font-bold">C</code>（或 <code class="text-sky-300 font-bold">Shift</code>）下降；地面按 <code class="text-emerald-300 font-bold">Shift</code> 切換跑步加速。</li>
+            </ul>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-700 space-y-1.5">
+            <div class="font-extrabold text-sky-300">🧱 2. 放置方塊、挖掘破壞與快捷熱鍵</div>
+            <ul class="space-y-1 text-slate-200 leading-relaxed list-disc pl-4">
+              <li><b>放置方塊 (蓋建築)</b>：按鍵盤 <code class="text-emerald-300 font-bold">R</code> 或 <code class="text-emerald-300 font-bold">Enter</code> 鍵，或<b>滑鼠左鍵點擊畫面</b>，即可在主角前方黑框處放置方塊。</li>
+              <li><b>挖掘破壞 (拆方塊)</b>：按鍵盤 <code class="text-rose-300 font-bold">X</code> / <code class="text-rose-300 font-bold">Delete</code> / <code class="text-rose-300 font-bold">Backspace</code>，或<b>滑鼠右鍵點擊畫面</b>即可挖掘破壞方塊。</li>
+              <li><b>選擇與更換方塊</b>：按數字鍵 <code class="text-amber-300 font-bold">1 ~ 9</code> 或滾動<b>滑鼠滾輪</b>切換快捷欄；按 <code class="text-indigo-300 font-bold">B</code> 鍵開啟/關閉 27 種方塊背包。</li>
+              <li><b>實用功能熱鍵</b>：<code class="text-amber-300 font-bold">V</code> 切換第一/第三人稱視角、<code class="text-amber-300 font-bold">Ctrl + Z</code> 復原方塊、<code class="text-amber-300 font-bold">F</code> 上車開北側車庫黑車、<code class="text-amber-300 font-bold">H</code> 開關本說明視窗。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- iPad 平板觸控專屬說明區塊 -->
+      <div class="space-y-2">
+        <div class="font-black text-amber-300 text-sm sm:text-base flex items-center gap-2">📱 二、iPad 平板觸控操作說明</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2">
+            <div class="font-extrabold text-amber-300 text-sm flex items-center gap-1.5">🕹️ 1. 左下角：麥塊十字移動搖桿</div>
+            <ul class="space-y-1.5 text-slate-200 leading-relaxed list-disc pl-4">
+              <li><b>滑動連按走位</b>：手指按住 <code class="text-yellow-300">▲ 前進</code>、<code class="text-yellow-300">▼ 後退</code>、<code class="text-yellow-300">◀ 左移</code>、<code class="text-yellow-300">▶ 右移</code> 或斜角 <code class="text-yellow-300">↖ ↗</code> 即可流暢移動，手指可直接滑過按鈕不需放開。</li>
+              <li><b>跳躍與創造飛行</b>：點擊中間 <code class="text-amber-300">⏫ 跳躍/飛</code> 可跳上自己蓋的方塊；<b>快速連點兩下中間鍵</b>（或點上方 <code class="text-sky-300">🕊️ 飛行</code>）即可在空中自由飛行蓋高樓！</li>
+            </ul>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2">
+            <div class="font-extrabold text-emerald-300 text-sm flex items-center gap-1.5">🧱 2. 右下角與畫面：視角、建造與挖掘</div>
+            <ul class="space-y-1.5 text-slate-200 leading-relaxed list-disc pl-4">
+              <li><b>單指滑動畫面</b>：上下左右轉動視角，主角正前方近距離會顯示<b>黑色預覽方塊框</b>。</li>
+              <li><b>放置與挖掘</b>：按右下角 <code class="text-emerald-300">🧱 放置方塊</code>（或<b>輕點畫面</b>）放置；按 <code class="text-rose-300">⛏️ 挖掘破壞</code>（或<b>長按畫面 0.4 秒</b>）敲碎方塊。</li>
+              <li><b>🎯 準星 vs 👆 點選建造</b>：點頂部 <code class="text-sky-300">🎯 準星模式</code> 可切換為「👆 點選畫面建造」（手指點哪裡就蓋哪裡）。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -216,10 +623,16 @@
     ];
 
     const state = {
-      mode: 'orbit', walkPov: 'third', showSubLabels: true, hideAllLabels: false,
+      mode: 'mc', walkPov: 'first', showSubLabels: false, hideAllLabels: false,
       categoryFilter: 'all', searchQuery: '', selectedPoiId: 'eco-pond',
-      timeOfDay: 'day', minimapFloor: 1, minimapCollapsed: false,
-      sidebarOpen: window.innerWidth >= 768, sprint: false, isDriving: false
+      timeOfDay: 'day', minimapFloor: 1, minimapCollapsed: window.innerWidth < 640,
+      sidebarOpen: false, sprint: false, isDriving: false,
+      isFlying: false, touchAimMode: 'crosshair', // 'crosshair' | 'tap'
+      touchTapTool: 'place', // 'place' | 'break'
+      mcControlScheme: 'touch', // 預設開啟 iPad 觸控虛擬十字鍵模式 ('touch' | 'pc')，可手動切換
+      blToolbarOpen: false, // 左下角「存檔/操作說明」工具列預設收合
+      soundEnabled: true,
+      activeHotbarIndex: 0
     };
 
     const container = document.getElementById('canvas-container');
@@ -228,7 +641,7 @@
     scene.background = new THREE.Color(0xbae6fd);
     scene.fog = new THREE.FogExp2(0xbae6fd, 0.0015);
 
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.35, 650);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.25, 650);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -250,8 +663,8 @@
     sunLight.shadow.bias = -0.0005;
     scene.add(ambientLight, hemiLight, sunLight);
 
-    const groupGround = new THREE.Group(), groupFloor1 = new THREE.Group(), groupFloor2 = new THREE.Group(), groupRoof = new THREE.Group();
-    scene.add(groupGround, groupFloor1, groupFloor2, groupRoof);
+    const groupGround = new THREE.Group(), groupFloor1 = new THREE.Group(), groupFloor2 = new THREE.Group(), groupRoof = new THREE.Group(), groupVoxelBlocks = new THREE.Group();
+    scene.add(groupGround, groupFloor1, groupFloor2, groupRoof, groupVoxelBlocks);
 
     function makeMat(color, opts = {}) {
       return new THREE.MeshStandardMaterial({
@@ -1215,7 +1628,7 @@
       }
     }
 
-    const character = { group: new THREE.Group(), x: 14.8, y: 0.0, z: 21.5, rotY: Math.PI / 2, vy: 0, onGround: true, targetFloor: 1, walkCycle: 0 };
+    const character = { group: new THREE.Group(), x: 14.8, y: 0.0, z: 21.5, rotY: Math.PI / 2, pitch: -0.45, vy: 0, onGround: true, targetFloor: 1, walkCycle: 0 };
     let charLeftLeg, charRightLeg, charLeftArm, charRightArm, charRing;
 
     function buildCharacterAvatar() {
@@ -1243,6 +1656,754 @@
 
       g.add(charLeftLeg, charRightLeg, torso, charLeftArm, charRightArm, head, cap, visor);
       scene.add(g);
+    }
+
+    // ================= 麥塊方塊系統 (Minecraft Voxel Engine) =================
+    const MC_STORAGE_AUTO_KEY = 'chenggong_mc_blocks_autosave_v1';
+    const MC_STORAGE_SLOT_PREFIX = 'chenggong_mc_blocks_slot_';
+
+    const MC_BLOCK_TYPES = [
+      { id: 'grass', name: '草地方塊', en: 'Grass Block', top: '#4d7c0f', side: '#78350f', topTrim: '#65a30d', bottom: '#78350f', pattern: 'grass' },
+      { id: 'dirt', name: '泥土方塊', en: 'Dirt', color: '#78350f', accent: '#5c2d16', pattern: 'noise' },
+      { id: 'stone', name: '石頭方塊', en: 'Stone', color: '#78716c', accent: '#57534e', pattern: 'noise' },
+      { id: 'cobble', name: '鵝卵石', en: 'Cobblestone', color: '#64748b', accent: '#334155', pattern: 'brick' },
+      { id: 'oak_log', name: '橡木原木', en: 'Oak Log', top: '#d6a868', side: '#5c4033', bottom: '#d6a868', accent: '#3e2723', pattern: 'log' },
+      { id: 'oak_planks', name: '橡木木板', en: 'Oak Planks', color: '#b47b44', accent: '#8c5828', pattern: 'planks' },
+      { id: 'leaves', name: '茂密樹葉', en: 'Oak Leaves', color: '#15803d', accent: '#14532d', pattern: 'leaves' },
+      { id: 'brick', name: '紅磚方塊', en: 'Bricks', color: '#b91c1c', accent: '#d6d3d1', pattern: 'brick' },
+      { id: 'campus_tile', name: '校園灰磁磚', en: 'Campus Gray Tile', color: '#7c8590', accent: '#475569', pattern: 'brick' },
+      { id: 'butterfly_mosaic', name: '紫蝶馬賽克磚', en: 'Purple Butterfly Block', color: '#7e22ce', accent: '#e9d5ff', pattern: 'butterfly' },
+      { id: 'glass', name: '透明玻璃', en: 'Glass Block', color: '#bae6fd', accent: '#f8fafc', pattern: 'glass', transparent: true, opacity: 0.48 },
+      { id: 'glowstone', name: '螢光石燈', en: 'Glowstone', color: '#facc15', accent: '#fef08a', pattern: 'glow', emissive: 0xf59e0b },
+      { id: 'water', name: '生態池水塊', en: 'Water Block', color: '#0284c7', accent: '#38bdf8', pattern: 'noise', transparent: true, opacity: 0.65 },
+      { id: 'gold', name: '黃金方塊', en: 'Gold Block', color: '#eab308', accent: '#fef08a', pattern: 'shiny' },
+      { id: 'diamond', name: '鑽石方塊', en: 'Diamond Block', color: '#06b6d4', accent: '#cffafe', pattern: 'shiny' },
+      { id: 'sandstone', name: '砂岩方塊', en: 'Sandstone', color: '#fde68a', accent: '#d97706', pattern: 'planks' },
+      { id: 'white_concrete', name: '白色矮牆磚', en: 'White Concrete', color: '#f8fafc', accent: '#cbd5e1', pattern: 'brick' },
+      { id: 'red_wool', name: '紅色方塊', en: 'Red Wool', color: '#dc2626', accent: '#991b1b', pattern: 'noise' },
+      { id: 'track_orange', name: 'PU跑道紅褐磚', en: 'PU Track Block', color: '#ea580c', accent: '#9a3412', pattern: 'noise' },
+      { id: 'court_blue', name: '晴天球場藍磚', en: 'Court Blue Block', color: '#0284c7', accent: '#0369a1', pattern: 'brick' },
+      { id: 'pink_lotus', name: '粉紅蓮花磚', en: 'Pink Lotus Block', color: '#ec4899', accent: '#fbcfe8', pattern: 'noise' },
+      { id: 'bookshelf', name: '圖書館書櫃', en: 'Bookshelf', top: '#b47b44', side: '#b47b44', bottom: '#b47b44', pattern: 'bookshelf' },
+      { id: 'crafting', name: '創客工作台', en: 'Crafting Table', top: '#9333ea', side: '#b47b44', bottom: '#78350f', pattern: 'crafting' },
+      { id: 'tnt', name: '慶典煙火磚(TNT)', en: 'TNT Block', top: '#dc2626', side: '#ef4444', bottom: '#dc2626', pattern: 'tnt' },
+      { id: 'quartz', name: '白色石英柱', en: 'Quartz Pillar', color: '#f1f5f9', accent: '#94a3b8', pattern: 'log' },
+      { id: 'emerald', name: '綠寶石方塊', en: 'Emerald Block', color: '#10b981', accent: '#a7f3d0', pattern: 'shiny' },
+      { id: 'obsidian', name: '黑曜石', en: 'Obsidian', color: '#1e1b4b', accent: '#4c1d95', pattern: 'noise' }
+    ];
+
+    const hotbarBlockIds = ['grass', 'oak_planks', 'brick', 'butterfly_mosaic', 'glass', 'glowstone', 'stone', 'diamond', 'leaves'];
+    const blockMaterialCache = new Map();
+    const blockIconDataUrlCache = new Map();
+    const sharedVoxelGeo = new THREE.BoxGeometry(1, 1, 1);
+
+    function createPixelFaceCanvas(baseHex, accentHex, pattern, faceType = 'side') {
+      const cvs = document.createElement('canvas');
+      cvs.width = 16; cvs.height = 16;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = baseHex;
+      ctx.fillRect(0, 0, 16, 16);
+
+      // Deterministic pseudo-random pixel art
+      let seed = (baseHex.charCodeAt(1) || 7) * 31 + (pattern.charCodeAt(0) || 13);
+      const rand = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+
+      if (pattern === 'grass' && faceType === 'side') {
+        ctx.fillStyle = '#78350f'; ctx.fillRect(0, 0, 16, 16);
+        for (let i = 0; i < 36; i++) {
+          ctx.fillStyle = rand() > 0.5 ? '#5c2d16' : '#8c4215';
+          ctx.fillRect(Math.floor(rand() * 16), 3 + Math.floor(rand() * 13), 1, 1);
+        }
+        ctx.fillStyle = '#4d7c0f'; ctx.fillRect(0, 0, 16, 3);
+        for (let x = 0; x < 16; x++) {
+          const drop = Math.floor(rand() * 3) + 2;
+          ctx.fillStyle = x % 2 === 0 ? '#65a30d' : '#4d7c0f';
+          ctx.fillRect(x, 0, 1, drop);
+        }
+      } else if (pattern === 'grass' && faceType === 'top') {
+        ctx.fillStyle = '#4d7c0f'; ctx.fillRect(0, 0, 16, 16);
+        for (let i = 0; i < 45; i++) {
+          ctx.fillStyle = rand() > 0.5 ? '#65a30d' : '#3f6212';
+          ctx.fillRect(Math.floor(rand() * 16), Math.floor(rand() * 16), 1, 1);
+        }
+      } else if (pattern === 'brick') {
+        ctx.fillStyle = accentHex;
+        for (let y = 0; y < 16; y += 4) {
+          ctx.fillRect(0, y, 16, 1);
+          const offset = (y / 4) % 2 === 0 ? 0 : 4;
+          for (let x = offset; x < 16; x += 8) ctx.fillRect(x, y, 1, 4);
+        }
+      } else if (pattern === 'planks') {
+        ctx.fillStyle = accentHex;
+        for (let y = 3; y < 16; y += 4) ctx.fillRect(0, y, 16, 1);
+        ctx.fillRect(7, 0, 1, 3); ctx.fillRect(12, 4, 1, 3); ctx.fillRect(4, 8, 1, 3); ctx.fillRect(10, 12, 1, 3);
+      } else if (pattern === 'log') {
+        if (faceType === 'top' || faceType === 'bottom') {
+          ctx.fillStyle = '#5c4033'; ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#d6a868'; ctx.fillRect(2, 2, 12, 12);
+          ctx.strokeStyle = '#b47b44'; ctx.lineWidth = 1; ctx.strokeRect(4.5, 4.5, 7, 7);
+        } else {
+          ctx.fillStyle = accentHex || '#3e2723';
+          for (let x = 1; x < 16; x += 3) ctx.fillRect(x, 0, 1, 16);
+        }
+      } else if (pattern === 'glass') {
+        ctx.clearRect(0, 0, 16, 16);
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.32)'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1); ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        ctx.fillRect(3, 3, 2, 1); ctx.fillRect(3, 4, 1, 2); ctx.fillRect(11, 11, 2, 1);
+      } else if (pattern === 'butterfly') {
+        ctx.fillStyle = '#581c87'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#c084fc';
+        ctx.fillRect(2, 3, 5, 5); ctx.fillRect(9, 3, 5, 5);
+        ctx.fillRect(3, 9, 4, 4); ctx.fillRect(9, 9, 4, 4);
+        ctx.fillStyle = '#fde047'; ctx.fillRect(7, 4, 2, 9);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(3, 4, 2, 2); ctx.fillRect(11, 4, 2, 2);
+      } else if (pattern === 'bookshelf' && faceType === 'side') {
+        ctx.fillStyle = '#78350f'; ctx.fillRect(0, 0, 16, 16);
+        const bookColors = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+        [2, 9].forEach(ry => {
+          ctx.fillStyle = '#1e293b'; ctx.fillRect(1, ry, 14, 5);
+          for (let bx = 2; bx < 14; bx += 2) {
+            ctx.fillStyle = bookColors[(bx + ry) % 5];
+            ctx.fillRect(bx, ry + 1, 2, 4);
+          }
+        });
+      } else if (pattern === 'tnt' && faceType === 'side') {
+        ctx.fillStyle = '#dc2626'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 5, 16, 6);
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(2, 6, 3, 1); ctx.fillRect(3, 7, 1, 3);
+        ctx.fillRect(6, 6, 1, 4); ctx.fillRect(7, 7, 1, 2); ctx.fillRect(9, 6, 1, 4);
+        ctx.fillRect(11, 6, 3, 1); ctx.fillRect(12, 7, 1, 3);
+      } else if (pattern === 'crafting' && faceType === 'top') {
+        ctx.fillStyle = '#b47b44'; ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#5c2d16';
+        for (let i = 2; i <= 14; i += 4) { ctx.fillRect(i, 2, 1, 12); ctx.fillRect(2, i, 12, 1); }
+      } else if (pattern === 'shiny' || pattern === 'glow') {
+        ctx.fillStyle = accentHex;
+        ctx.fillRect(1, 1, 14, 1); ctx.fillRect(1, 1, 1, 14);
+        ctx.fillRect(4, 4, 3, 3); ctx.fillRect(10, 9, 2, 2);
+      } else {
+        for (let i = 0; i < 42; i++) {
+          ctx.fillStyle = rand() > 0.45 ? accentHex : baseHex;
+          ctx.fillRect(Math.floor(rand() * 16), Math.floor(rand() * 16), 1, 1);
+        }
+      }
+      // Subtle pixel border for crisp voxel definition
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, 15, 15);
+      return cvs;
+    }
+
+    function makeNearestTex(cvs) {
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      tex.generateMipmaps = false;
+      return tex;
+    }
+
+    function getBlockMaterial(blockId) {
+      if (blockMaterialCache.has(blockId)) return blockMaterialCache.get(blockId);
+      const def = MC_BLOCK_TYPES.find(b => b.id === blockId) || MC_BLOCK_TYPES[0];
+      const opts = {
+        roughness: def.pattern === 'shiny' ? 0.32 : 0.82,
+        metalness: def.pattern === 'shiny' ? 0.35 : 0.05,
+        transparent: !!def.transparent,
+        opacity: def.opacity !== undefined ? def.opacity : 1.0
+      };
+      if (def.emissive) {
+        opts.emissive = new THREE.Color(def.emissive);
+        opts.emissiveIntensity = 0.55;
+      }
+
+      const sideCvs = createPixelFaceCanvas(def.side || def.color, def.accent || '#334155', def.pattern, 'side');
+      const topCvs = createPixelFaceCanvas(def.top || def.color, def.topTrim || def.accent || '#334155', def.pattern, 'top');
+      const botCvs = createPixelFaceCanvas(def.bottom || def.color, def.accent || '#334155', def.pattern === 'grass' ? 'noise' : def.pattern, 'bottom');
+
+      blockIconDataUrlCache.set(blockId, sideCvs.toDataURL());
+
+      const sideMat = new THREE.MeshStandardMaterial({ ...opts, map: makeNearestTex(sideCvs) });
+      const topMat = new THREE.MeshStandardMaterial({ ...opts, map: makeNearestTex(topCvs) });
+      const botMat = new THREE.MeshStandardMaterial({ ...opts, map: makeNearestTex(botCvs) });
+
+      const matArray = [sideMat, sideMat, topMat, botMat, sideMat, sideMat];
+      blockMaterialCache.set(blockId, matArray);
+      return matArray;
+    }
+
+    function preloadAllBlockMaterials() {
+      MC_BLOCK_TYPES.forEach(b => getBlockMaterial(b.id));
+    }
+
+    // Web Audio API 麥塊音效合成器
+    let audioCtx = null;
+    function playMcSound(type = 'place') {
+      if (!state.soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const now = audioCtx.currentTime;
+        if (type === 'place') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(170, now);
+          osc.frequency.exponentialRampToValueAtTime(320, now + 0.065);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.08);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.085);
+        } else if (type === 'break') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(240, now);
+          osc.frequency.exponentialRampToValueAtTime(75, now + 0.11);
+          gain.gain.setValueAtTime(0.20, now);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.12);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.125);
+        } else if (type === 'click') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.04);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(now); osc.stop(now + 0.045);
+        }
+      } catch (err) {}
+    }
+
+    // 放置與破壞方塊管理
+    const placedBlocksMap = new Map(); // key: "gx,gy,gz" -> { gx, gy, gz, type, mesh }
+    const columnTopMap = new Map(); // key: "gx,gz" -> highest gy
+    const undoStack = [];
+    const blockParticles = [];
+    const particleGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+
+    function blockKey(gx, gy, gz) { return `${gx},${gy},${gz}`; }
+    function colKey(gx, gz) { return `${gx},${gz}`; }
+
+    function recomputeColumnTop(gx, gz) {
+      const ck = colKey(gx, gz);
+      let maxGy = -Infinity;
+      placedBlocksMap.forEach(entry => {
+        if (entry.gx === gx && entry.gz === gz && entry.gy > maxGy) maxGy = entry.gy;
+      });
+      if (maxGy === -Infinity) columnTopMap.delete(ck);
+      else columnTopMap.set(ck, maxGy);
+    }
+
+    function spawnBlockParticles(wx, wy, wz, blockId) {
+      const def = MC_BLOCK_TYPES.find(b => b.id === blockId) || MC_BLOCK_TYPES[0];
+      const pMat = new THREE.MeshBasicMaterial({ color: def.color || def.top || '#65a30d' });
+      for (let i = 0; i < 10; i++) {
+        const pm = new THREE.Mesh(particleGeo, pMat);
+        pm.position.set(wx + (Math.random() - 0.5) * 0.6, wy + (Math.random() - 0.5) * 0.6, wz + (Math.random() - 0.5) * 0.6);
+        scene.add(pm);
+        blockParticles.push({
+          mesh: pm,
+          vx: (Math.random() - 0.5) * 4.5,
+          vy: 1.8 + Math.random() * 3.2,
+          vz: (Math.random() - 0.5) * 4.5,
+          life: 0.42
+        });
+      }
+    }
+
+    function swingCharacterRightArm() {
+      if (charRightArm) charRightArm.rotation.x = -1.35;
+      if (fpHandGroup) fpHandSwing = 1.0;
+    }
+
+    function placeVoxelBlock(gx, gy, gz, blockId, recordUndo = true, silent = false) {
+      gx = Math.round(gx); gy = Math.round(gy); gz = Math.round(gz);
+      if (gy < 0 || gy > 85 || gx < -140 || gx > 140 || gz < -100 || gz > 100) return false;
+      const key = blockKey(gx, gy, gz);
+      const prev = placedBlocksMap.get(key);
+      if (prev && prev.type === blockId) return false;
+      if (prev) {
+        groupVoxelBlocks.remove(prev.mesh);
+        placedBlocksMap.delete(key);
+      }
+
+      const mesh = new THREE.Mesh(sharedVoxelGeo, getBlockMaterial(blockId));
+      mesh.position.set(gx + 0.5, gy + 0.5, gz + 0.5);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData = { isVoxelBlock: true, gx, gy, gz, type: blockId };
+      groupVoxelBlocks.add(mesh);
+
+      placedBlocksMap.set(key, { gx, gy, gz, type: blockId, mesh });
+      const ck = colKey(gx, gz);
+      const curTop = columnTopMap.get(ck);
+      if (curTop === undefined || gy > curTop) columnTopMap.set(ck, gy);
+
+      if (recordUndo) {
+        undoStack.push({ action: 'place', gx, gy, gz, prevType: prev ? prev.type : null, newType: blockId });
+        if (undoStack.length > 80) undoStack.shift();
+      }
+      if (!silent) {
+        playMcSound('place');
+        swingCharacterRightArm();
+        spawnBlockParticles(gx + 0.5, gy + 0.5, gz + 0.5, blockId);
+        autoSaveBlocksToLocal();
+      }
+      updateBlockCountBadge();
+      return true;
+    }
+
+    function removeVoxelBlock(gx, gy, gz, recordUndo = true, silent = false) {
+      gx = Math.round(gx); gy = Math.round(gy); gz = Math.round(gz);
+      const key = blockKey(gx, gy, gz);
+      const existing = placedBlocksMap.get(key);
+      if (!existing) return false;
+      groupVoxelBlocks.remove(existing.mesh);
+      placedBlocksMap.delete(key);
+      recomputeColumnTop(gx, gz);
+
+      if (recordUndo) {
+        undoStack.push({ action: 'remove', gx, gy, gz, prevType: existing.type });
+        if (undoStack.length > 80) undoStack.shift();
+      }
+      if (!silent) {
+        playMcSound('break');
+        swingCharacterRightArm();
+        spawnBlockParticles(gx + 0.5, gy + 0.5, gz + 0.5, existing.type);
+        autoSaveBlocksToLocal();
+      }
+      updateBlockCountBadge();
+      return true;
+    }
+
+    function undoLastVoxelAction() {
+      const last = undoStack.pop();
+      if (!last) return;
+      if (last.action === 'place') {
+        if (last.prevType) placeVoxelBlock(last.gx, last.gy, last.gz, last.prevType, false, false);
+        else removeVoxelBlock(last.gx, last.gy, last.gz, false, false);
+      } else if (last.action === 'remove') {
+        placeVoxelBlock(last.gx, last.gy, last.gz, last.prevType, false, false);
+      }
+      autoSaveBlocksToLocal();
+    }
+
+    function updateBlockCountBadge() {
+      const badge = document.getElementById('mc-block-count-badge');
+      if (badge) badge.textContent = `🧱 ${placedBlocksMap.size} 方塊`;
+    }
+
+    // 第一人稱右下角麥塊手持方塊 (First-person held block)
+    const fpHandGroup = new THREE.Group();
+    let fpHandMesh = null, fpHandSwing = 0;
+    function initFirstPersonHand() {
+      const activeId = hotbarBlockIds[state.activeHotbarIndex] || 'grass';
+      fpHandMesh = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), getBlockMaterial(activeId));
+      fpHandMesh.rotation.set(0.25, -0.65, 0.1);
+      fpHandGroup.add(fpHandMesh);
+      camera.add(fpHandGroup);
+      scene.add(camera);
+    }
+    function updateFirstPersonHeldBlockMaterial() {
+      if (!fpHandMesh) return;
+      const activeId = hotbarBlockIds[state.activeHotbarIndex] || 'grass';
+      fpHandMesh.material = getBlockMaterial(activeId);
+    }
+
+    // 目標方塊高對比預覽線框 (Target Voxel Highlight Box)
+    const highlightGroup = new THREE.Group();
+    const highlightWire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(1.015, 1.015, 1.015)),
+      new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
+    );
+    const highlightGhost = new THREE.Mesh(
+      new THREE.BoxGeometry(1.005, 1.005, 1.005),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.22, depthWrite: false })
+    );
+    highlightGroup.add(highlightWire, highlightGhost);
+    highlightGroup.visible = false;
+    scene.add(highlightGroup);
+
+    const raycaster = new THREE.Raycaster();
+    let currentAimTarget = null; // { placePos: [gx,gy,gz], breakPos: [gx,gy,gz] | null }
+
+    function getRaycastTargetsList() {
+      return [groupVoxelBlocks, groupGround, groupFloor1, groupFloor2, groupRoof];
+    }
+
+    // 計算主角正前方近距離目標方塊（距離主角約 1.8～2.8 格，不再跑到遠處）
+    function computeCloseCharacterTarget() {
+      const cosP = Math.cos(character.pitch), sinP = Math.sin(character.pitch);
+      const dir = new THREE.Vector3(-Math.sin(character.rotY) * cosP, sinP, -Math.cos(character.rotY) * cosP).normalize();
+      const origin = new THREE.Vector3(character.x, character.y + 1.62, character.z);
+
+      raycaster.set(origin, dir);
+      raycaster.far = 3.8; // 限制近距離射線（約 2～3.5 格）
+      const intersects = raycaster.intersectObjects(getRaycastTargetsList(), true);
+
+      if (intersects.length > 0 && intersects[0].face) {
+        const hit = intersects[0];
+        const worldNormal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+        if (hit.object.userData && hit.object.userData.isVoxelBlock) {
+          const { gx, gy, gz } = hit.object.userData;
+          const nx = Math.round(worldNormal.x), ny = Math.round(worldNormal.y), nz = Math.round(worldNormal.z);
+          return {
+            isVoxel: true,
+            breakPos: [gx, gy, gz],
+            placePos: [gx + nx, gy + ny, gz + nz]
+          };
+        }
+
+        // 若打到地面或建築物，限制水平距離不超過主角前方 2.5 格
+        const pt = hit.point.clone().addScaledVector(worldNormal, 0.42);
+        let dx = pt.x - character.x;
+        let dz = pt.z - character.z;
+        const hDist = Math.hypot(dx, dz);
+        if (hDist > 2.5) {
+          const scale = 2.2 / hDist;
+          dx *= scale;
+          dz *= scale;
+        } else if (hDist < 1.15) {
+          const fx = -Math.sin(character.rotY), fz = -Math.cos(character.rotY);
+          dx = fx * 1.8;
+          dz = fz * 1.8;
+        }
+        const gx = Math.floor(character.x + dx);
+        const gy = Math.max(0, Math.floor(pt.y));
+        const gz = Math.floor(character.z + dz);
+        const hasBlockHere = placedBlocksMap.has(blockKey(gx, gy, gz));
+        return {
+          isVoxel: hasBlockHere,
+          breakPos: hasBlockHere ? [gx, gy, gz] : null,
+          placePos: hasBlockHere ? [gx, gy + 1, gz] : [gx, gy, gz]
+        };
+      }
+
+      // 若視角平視或朝上未碰到地面，自動鎖定在主角正前方 2.0 格處
+      const fx = -Math.sin(character.rotY), fz = -Math.cos(character.rotY);
+      const gx = Math.floor(character.x + fx * 2.0);
+      const gz = Math.floor(character.z + fz * 2.0);
+      const pitchOffset = character.pitch > 0.15 ? Math.round(Math.sin(character.pitch) * 2.0) : 0;
+      let gy = Math.max(0, Math.floor(character.y + 0.15) + pitchOffset);
+
+      // 若正前方該格已有方塊，方便直接挖掘或往上疊加
+      if (placedBlocksMap.has(blockKey(gx, gy, gz))) {
+        return {
+          isVoxel: true,
+          breakPos: [gx, gy, gz],
+          placePos: [gx, gy + 1, gz]
+        };
+      }
+      return {
+        isVoxel: false,
+        breakPos: null,
+        placePos: [gx, gy, gz]
+      };
+    }
+
+    function computeVoxelRaycastFromNDC(ndcX, ndcY, maxDist = 45) {
+      // 在麥塊建造模式下，準星中心 (0, 0) 一律使用主角正前方近距離目標框
+      if (state.mode === 'mc' && ndcX === 0 && ndcY === 0) {
+        return computeCloseCharacterTarget();
+      }
+      raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
+      raycaster.far = maxDist;
+      const intersects = raycaster.intersectObjects(getRaycastTargetsList(), true);
+      if (!intersects.length) return state.mode === 'mc' ? computeCloseCharacterTarget() : null;
+      const hit = intersects[0];
+      if (!hit.face) return state.mode === 'mc' ? computeCloseCharacterTarget() : null;
+
+      const worldNormal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+      if (hit.object.userData && hit.object.userData.isVoxelBlock) {
+        const { gx, gy, gz } = hit.object.userData;
+        const nx = Math.round(worldNormal.x), ny = Math.round(worldNormal.y), nz = Math.round(worldNormal.z);
+        return {
+          isVoxel: true,
+          breakPos: [gx, gy, gz],
+          placePos: [gx + nx, gy + ny, gz + nz]
+        };
+      } else {
+        const pt = hit.point.clone().addScaledVector(worldNormal, 0.42);
+        const gx = Math.floor(pt.x);
+        const gy = Math.max(0, Math.floor(pt.y));
+        const gz = Math.floor(pt.z);
+        return {
+          isVoxel: false,
+          breakPos: null,
+          placePos: [gx, gy, gz]
+        };
+      }
+    }
+
+    function updateCrosshairVoxelPreview() {
+      // 僅在「麥塊建造模式 (mc)」顯示目標黑框；「人物自由走動 (walk)」與「自由查看設施 (orbit)」不顯示任何麥塊黑框
+      if (state.mode !== 'mc' || state.isDriving) {
+        highlightGroup.visible = false;
+        currentAimTarget = null;
+        return;
+      }
+      const res = computeCloseCharacterTarget();
+      currentAimTarget = res;
+      if (!res) {
+        highlightGroup.visible = false;
+        return;
+      }
+      highlightGroup.visible = true;
+      if (res.isVoxel && state.touchTapTool === 'break') {
+        const [bx, by, bz] = res.breakPos;
+        highlightGroup.position.set(bx + 0.5, by + 0.5, bz + 0.5);
+        highlightGhost.material.color.setHex(0xef4444);
+      } else {
+        const [px, py, pz] = res.placePos;
+        highlightGroup.position.set(px + 0.5, py + 0.5, pz + 0.5);
+        highlightGhost.material.color.setHex(0xfacc15);
+      }
+    }
+
+    function triggerPlaceAtAim(customResult = null) {
+      if (state.mode !== 'mc') return;
+      const target = customResult || currentAimTarget || computeCloseCharacterTarget();
+      if (!target || !target.placePos) return;
+      const [gx, gy, gz] = target.placePos;
+      if (!state.isFlying) {
+        const dx = Math.abs((gx + 0.5) - character.x);
+        const dz = Math.abs((gz + 0.5) - character.z);
+        const dy = gy - character.y;
+        if (dx < 0.72 && dz < 0.72 && dy >= -0.2 && dy <= 1.6) {
+          character.y = gy + 1.0;
+          character.group.position.y = character.y;
+        }
+      }
+      const activeId = hotbarBlockIds[state.activeHotbarIndex] || 'grass';
+      placeVoxelBlock(gx, gy, gz, activeId, true, false);
+    }
+
+    function triggerBreakAtAim(customResult = null) {
+      if (state.mode !== 'mc') return;
+      const target = customResult || currentAimTarget || computeCloseCharacterTarget();
+      if (!target) return;
+      if (target.breakPos) {
+        const [bx, by, bz] = target.breakPos;
+        removeVoxelBlock(bx, by, bz, true, false);
+      } else if (target.placePos) {
+        const [px, py, pz] = target.placePos;
+        if (!removeVoxelBlock(px, py, pz, true, false)) {
+          removeVoxelBlock(px, py - 1, pz, true, false);
+        }
+      }
+    }
+
+    // ================= 本地儲存、匯出與匯入系統 (LocalStorage & JSON Export/Import) =================
+    function serializePlacedBlocks() {
+      const blocks = [];
+      placedBlocksMap.forEach(b => {
+        blocks.push([b.gx, b.gy, b.gz, b.type]);
+      });
+      return {
+        version: 1,
+        school: '雲林縣林內鄉成功國小3D麥塊地圖',
+        savedAt: new Date().toISOString(),
+        count: blocks.length,
+        playerPos: [Math.round(character.x * 10) / 10, Math.round(character.y * 10) / 10, Math.round(character.z * 10) / 10],
+        blocks
+      };
+    }
+
+    function loadSerializedBlocks(dataObj, merge = false) {
+      if (!dataObj || !Array.isArray(dataObj.blocks)) return false;
+      if (!merge) {
+        placedBlocksMap.forEach(entry => groupVoxelBlocks.remove(entry.mesh));
+        placedBlocksMap.clear();
+        columnTopMap.clear();
+        undoStack.length = 0;
+      }
+      dataObj.blocks.forEach(item => {
+        if (Array.isArray(item) && item.length >= 4) {
+          placeVoxelBlock(Number(item[0]), Number(item[1]), Number(item[2]), String(item[3]), false, true);
+        } else if (item && typeof item === 'object') {
+          placeVoxelBlock(Number(item.x ?? item.gx), Number(item.y ?? item.gy), Number(item.z ?? item.gz), String(item.type || 'grass'), false, true);
+        }
+      });
+      autoSaveBlocksToLocal();
+      updateBlockCountBadge();
+      return true;
+    }
+
+    function autoSaveBlocksToLocal() {
+      try {
+        const payload = JSON.stringify(serializePlacedBlocks());
+        localStorage.setItem(MC_STORAGE_AUTO_KEY, payload);
+      } catch (e) {}
+    }
+
+    function loadAutoSavedBlocksFromLocal() {
+      try {
+        const raw = localStorage.getItem(MC_STORAGE_AUTO_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.blocks) && parsed.blocks.length > 0) {
+          loadSerializedBlocks(parsed, false);
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    function buildStarterDemoCreation(merge = true) {
+      // 在中庭花園與生態池旁建立一座繽紛的「成功國小紫斑蝶麥塊拱門與瞭望樹屋」
+      if (!merge) {
+        placedBlocksMap.forEach(entry => groupVoxelBlocks.remove(entry.mesh));
+        placedBlocksMap.clear();
+        columnTopMap.clear();
+      }
+      const add = (x, y, z, t) => placeVoxelBlock(x, y, z, t, false, true);
+      // 1. 紫斑蝶歡迎拱門 (位於 X=11..17, Z=25)
+      for (let y = 0; y < 5; y++) { add(11, y, 25, 'quartz'); add(17, y, 25, 'quartz'); }
+      for (let x = 11; x <= 17; x++) { add(x, 5, 25, 'butterfly_mosaic'); }
+      add(12, 6, 25, 'glowstone'); add(14, 6, 25, 'diamond'); add(16, 6, 25, 'glowstone');
+      // 2. 像素紫斑蝶圖騰 (位於中庭南側 X=14, Y=7..11, Z=25)
+      add(14, 7, 25, 'gold'); add(14, 8, 25, 'gold'); add(14, 9, 25, 'gold');
+      add(12, 8, 25, 'butterfly_mosaic'); add(13, 8, 25, 'butterfly_mosaic');
+      add(15, 8, 25, 'butterfly_mosaic'); add(16, 8, 25, 'butterfly_mosaic');
+      add(11, 9, 25, 'pink_lotus'); add(12, 9, 25, 'butterfly_mosaic');
+      add(16, 9, 25, 'butterfly_mosaic'); add(17, 9, 25, 'pink_lotus');
+      add(12, 7, 25, 'emerald'); add(16, 7, 25, 'emerald');
+
+      // 3. 麥塊木造小涼亭與階梯 (位於 X=12..16, Z=15..19)
+      for (let x = 12; x <= 16; x++) {
+        for (let z = 15; z <= 19; z++) {
+          add(x, 0, z, 'oak_planks');
+          add(x, 4, z, 'leaves');
+        }
+      }
+      [[12, 15], [16, 15], [12, 19], [16, 19]].forEach(([px, pz]) => {
+        for (let y = 1; y <= 3; y++) add(px, y, pz, 'oak_log');
+      });
+      add(14, 3, 17, 'glowstone');
+      add(13, 1, 16, 'crafting');
+      add(15, 1, 16, 'bookshelf');
+      autoSaveBlocksToLocal();
+      updateBlockCountBadge();
+      playMcSound('place');
+    }
+
+    function renderSaveSlotsUI() {
+      const containerEl = document.getElementById('mc-save-slots-list');
+      if (!containerEl) return;
+      containerEl.innerHTML = '';
+      for (let slot = 1; slot <= 3; slot++) {
+        const key = `${MC_STORAGE_SLOT_PREFIX}${slot}`;
+        let infoText = '尚無存檔資料';
+        let hasData = false;
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const d = JSON.parse(raw);
+            if (d && Array.isArray(d.blocks)) {
+              hasData = true;
+              const dtStr = d.savedAt ? new Date(d.savedAt).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+              infoText = `🧱 ${d.blocks.length} 個方塊 (${dtStr})`;
+            }
+          }
+        } catch (e) {}
+
+        const card = document.createElement('div');
+        card.className = 'p-3 rounded-xl bg-slate-900/90 border border-slate-700 flex flex-col justify-between gap-2';
+        card.innerHTML = `
+          <div>
+            <div class="text-xs font-extrabold text-white">存檔槽 #${slot}</div>
+            <div class="text-[11px] ${hasData ? 'text-emerald-300 font-bold' : 'text-slate-400'} mt-0.5">${infoText}</div>
+          </div>
+          <div class="flex items-center gap-1.5 pt-1">
+            <button data-slot-save="${slot}" class="flex-1 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[11px] font-extrabold text-white">💾 寫入</button>
+            <button data-slot-load="${slot}" ${hasData ? '' : 'disabled'} class="flex-1 py-1.5 rounded-lg ${hasData ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'} text-[11px] font-extrabold">📂 讀取</button>
+          </div>
+        `;
+        containerEl.appendChild(card);
+      }
+
+      containerEl.querySelectorAll('[data-slot-save]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const slot = btn.getAttribute('data-slot-save');
+          localStorage.setItem(`${MC_STORAGE_SLOT_PREFIX}${slot}`, JSON.stringify(serializePlacedBlocks()));
+          playMcSound('place');
+          document.getElementById('save-modal-status').textContent = `✅ 已成功儲存 ${placedBlocksMap.size} 個方塊至「本地存檔槽 #${slot}」！`;
+          renderSaveSlotsUI();
+        });
+      });
+
+      containerEl.querySelectorAll('[data-slot-load]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const slot = btn.getAttribute('data-slot-load');
+          const raw = localStorage.getItem(`${MC_STORAGE_SLOT_PREFIX}${slot}`);
+          if (!raw) return;
+          try {
+            const data = JSON.parse(raw);
+            loadSerializedBlocks(data, false);
+            playMcSound('place');
+            document.getElementById('save-modal-status').textContent = `✅ 已從「本地存檔槽 #${slot}」載入 ${placedBlocksMap.size} 個方塊！`;
+            document.getElementById('mc-json-textarea').value = JSON.stringify(serializePlacedBlocks());
+          } catch (e) {}
+        });
+      });
+    }
+
+    function renderHotbarAndInventoryUI() {
+      const hotbarContainer = document.getElementById('mc-hotbar-slots');
+      const invGrid = document.getElementById('mc-inventory-grid');
+      if (!hotbarContainer || !invGrid) return;
+
+      hotbarContainer.innerHTML = '';
+      hotbarBlockIds.forEach((blockId, idx) => {
+        const def = MC_BLOCK_TYPES.find(b => b.id === blockId) || MC_BLOCK_TYPES[0];
+        const slotEl = document.createElement('button');
+        slotEl.className = `mc-slot rounded-lg ${idx === state.activeHotbarIndex ? 'active-slot' : ''}`;
+        slotEl.title = `${idx + 1}: ${def.name}`;
+        const iconUrl = blockIconDataUrlCache.get(def.id);
+        slotEl.innerHTML = `
+          <img src="${iconUrl}" alt="${def.name}" />
+          <span class="absolute top-0.5 left-1 text-[9px] font-black text-white/80 drop-shadow">${idx + 1}</span>
+        `;
+        slotEl.addEventListener('click', e => {
+          e.stopPropagation();
+          selectHotbarSlot(idx);
+        });
+        hotbarContainer.appendChild(slotEl);
+      });
+
+      const activeDef = MC_BLOCK_TYPES.find(b => b.id === hotbarBlockIds[state.activeHotbarIndex]) || MC_BLOCK_TYPES[0];
+      const tooltipEl = document.getElementById('mc-item-tooltip');
+      if (tooltipEl) tooltipEl.textContent = `🧱 ${activeDef.name} (${activeDef.en})`;
+      const invSlotNumEl = document.getElementById('inv-target-slot-num');
+      if (invSlotNumEl) invSlotNumEl.textContent = String(state.activeHotbarIndex + 1);
+
+      invGrid.innerHTML = '';
+      MC_BLOCK_TYPES.forEach(def => {
+        const isEquipped = hotbarBlockIds[state.activeHotbarIndex] === def.id;
+        const itemBtn = document.createElement('button');
+        itemBtn.className = `p-2 rounded-xl border-2 flex flex-col items-center gap-1.5 transition ${isEquipped ? 'bg-indigo-600/50 border-yellow-400 shadow-lg' : 'bg-slate-800/90 hover:bg-slate-700 border-slate-600'}`;
+        const iconUrl = blockIconDataUrlCache.get(def.id);
+        itemBtn.innerHTML = `
+          <img src="${iconUrl}" alt="${def.name}" class="w-10 h-10" style="image-rendering: pixelated;" />
+          <span class="text-[11px] font-extrabold text-white text-center leading-tight">${def.name}</span>
+        `;
+        itemBtn.addEventListener('click', () => {
+          hotbarBlockIds[state.activeHotbarIndex] = def.id;
+          playMcSound('click');
+          updateFirstPersonHeldBlockMaterial();
+          renderHotbarAndInventoryUI();
+          document.getElementById('mc-inventory-modal').classList.add('hidden');
+        });
+        invGrid.appendChild(itemBtn);
+      });
+    }
+
+    function selectHotbarSlot(index) {
+      state.activeHotbarIndex = Math.max(0, Math.min(8, index));
+      playMcSound('click');
+      updateFirstPersonHeldBlockMaterial();
+      renderHotbarAndInventoryUI();
     }
 
     const WALKABLE_2F_ZONES = [
@@ -1286,6 +2447,14 @@
     ];
 
     function isCollidingWith1FBuildings(px, pz, radius = 0.45) {
+      if (state.isFlying) return false;
+      // Check user-placed voxel blocks at character body height (feet +0.2 to +1.5)
+      const gx = Math.floor(px), gz = Math.floor(pz);
+      const footGy = Math.floor(character.y + 0.15);
+      const headGy = Math.floor(character.y + 1.4);
+      if (placedBlocksMap.has(blockKey(gx, footGy + 1, gz)) || placedBlocksMap.has(blockKey(gx, headGy, gz))) {
+        return true;
+      }
       if (px >= 38.35 && px <= 41.45 && pz >= -32.6 && pz <= -17.0) return false;
       if (px >= 41.7 && px <= 44.1 && pz >= -25.8 && pz <= -17.0) return false;
       if (px >= 24.8 && px <= 33.6 && pz >= -8.85 && pz <= -5.4) return false;
@@ -1293,25 +2462,40 @@
     }
 
     function computeGroundAndStairElevation(cx, cz) {
+      let baseElev = 0.0;
       if (cx >= 41.6 && cx <= 46.8 && cz >= -26.0 && cz <= -17.0) {
-        if (cz <= -22.8) { character.targetFloor = 1.5; updateCharacterFloorBadge(); return 2.38; }
-        if (cx < 44.2) { const r1 = Math.max(0, Math.min(1, (-17.2 - cz) / 5.6)); character.targetFloor = r1 > 0.35 ? 1.5 : 1; updateCharacterFloorBadge(); return 0.28 + r1 * 2.10; }
-        const r2 = Math.max(0, Math.min(1, (cz - (-22.8)) / 5.6)); character.targetFloor = r2 > 0.72 ? 2 : 1.5; updateCharacterFloorBadge(); return 2.38 + r2 * 2.10;
-      }
-      if (cx >= 24.8 && cx <= 33.8 && cz >= -12.5 && cz <= -5.3) {
-        if (cx >= 30.6) { character.targetFloor = 1.5; updateCharacterFloorBadge(); return 2.38; }
-        if (cz >= -8.9) { const r1 = Math.max(0, Math.min(1, (cx - 25.0) / 5.6)); character.targetFloor = r1 > 0.35 ? 1.5 : 1; updateCharacterFloorBadge(); return 0.28 + r1 * 2.10; }
-        const r2 = Math.max(0, Math.min(1, (30.6 - cx) / 5.6)); character.targetFloor = r2 > 0.72 ? 2 : 1.5; updateCharacterFloorBadge(); return 2.38 + r2 * 2.10;
-      }
-      if (character.targetFloor === 2) return 4.48;
-      if ((cx >= -15.2 && cx <= 93.2 && cz >= -18.0 && cz <= -13.3) || (cx >= 38.2 && cx <= 41.6 && cz >= -32.3 && cz <= -13.3) || (cx >= 20.6 && cx <= 25.4 && cz >= -13.8 && cz <= 36.0)) {
+        if (cz <= -22.8) { character.targetFloor = 1.5; updateCharacterFloorBadge(); baseElev = 2.38; }
+        else if (cx < 44.2) { const r1 = Math.max(0, Math.min(1, (-17.2 - cz) / 5.6)); character.targetFloor = r1 > 0.35 ? 1.5 : 1; updateCharacterFloorBadge(); baseElev = 0.28 + r1 * 2.10; }
+        else { const r2 = Math.max(0, Math.min(1, (cz - (-22.8)) / 5.6)); character.targetFloor = r2 > 0.72 ? 2 : 1.5; updateCharacterFloorBadge(); baseElev = 2.38 + r2 * 2.10; }
+      } else if (cx >= 24.8 && cx <= 33.8 && cz >= -12.5 && cz <= -5.3) {
+        if (cx >= 30.6) { character.targetFloor = 1.5; updateCharacterFloorBadge(); baseElev = 2.38; }
+        else if (cz >= -8.9) { const r1 = Math.max(0, Math.min(1, (cx - 25.0) / 5.6)); character.targetFloor = r1 > 0.35 ? 1.5 : 1; updateCharacterFloorBadge(); baseElev = 0.28 + r1 * 2.10; }
+        else { const r2 = Math.max(0, Math.min(1, (30.6 - cx) / 5.6)); character.targetFloor = r2 > 0.72 ? 2 : 1.5; updateCharacterFloorBadge(); baseElev = 2.38 + r2 * 2.10; }
+      } else if (character.targetFloor === 2) {
+        baseElev = 4.48;
+      } else if ((cx >= -15.2 && cx <= 93.2 && cz >= -18.0 && cz <= -13.3) || (cx >= 38.2 && cx <= 41.6 && cz >= -32.3 && cz <= -13.3) || (cx >= 20.6 && cx <= 25.4 && cz >= -13.8 && cz <= 36.0)) {
         if (character.targetFloor === 1.5) { character.targetFloor = 1; updateCharacterFloorBadge(); }
-        return 0.28;
+        baseElev = 0.28;
       }
-      return 0.0;
+
+      // Check placed voxel blocks under character so player can stand & climb on built blocks!
+      const gx = Math.floor(cx), gz = Math.floor(cz);
+      const maxBlockGy = columnTopMap.get(colKey(gx, gz));
+      if (maxBlockGy !== undefined) {
+        for (let gy = maxBlockGy; gy >= 0; gy--) {
+          if (placedBlocksMap.has(blockKey(gx, gy, gz))) {
+            const topY = gy + 1.0;
+            if (topY <= character.y + 1.25 && topY > baseElev) {
+              return topY;
+            }
+          }
+        }
+      }
+      return baseElev;
     }
 
     function applyCorridorWallCollision(nx, nz, radius = 0.45) {
+      if (state.isFlying) return [nx, nz];
       const ox = state.isDriving ? drivableCar.x : character.x;
       const oz = state.isDriving ? drivableCar.z : character.z;
       if (!state.isDriving && ox >= 41.65 && ox <= 46.7 && oz < -17.05 && oz >= -25.9) {
@@ -1349,19 +2533,114 @@
       orbit.flyAnim = { startTime: performance.now(), duration: 650, startTarget, endTarget, startR: orbit.spherical.radius, endR: endSpherical.radius, startPhi: orbit.spherical.phi, endPhi: endSpherical.phi, startTheta: orbit.spherical.theta, endTheta: endSpherical.theta };
     }
 
+    // ================= PC 鍵盤滑鼠與 iPad 觸控麥塊操作系統 (PC Keyboard/Mouse & Multi-Touch Controls) =================
     const domElem = renderer.domElement;
+    const touchRingEl = document.getElementById('mc-touch-ring');
+    const keys = { w: false, a: false, s: false, d: false, q: false, e: false, flyUp: false, flyDown: false, pitchUp: false, pitchDown: false };
+
+    let activeLookPointerId = null;
+    let pointerDownInfo = null; // { id, startX, startY, lastX, lastY, startTime, moved, holdTimer, brokeByHold }
+    let pinchStartDist = null;
+    let pinchStartRadius = null;
+
     domElem.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Multi-touch pinch zoom in Orbit mode on iPad
+    domElem.addEventListener('touchstart', e => {
+      if (e.touches.length === 2 && state.mode === 'orbit') {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchStartDist = Math.hypot(dx, dy);
+        pinchStartRadius = orbit.spherical.radius;
+      }
+    }, { passive: false });
+
+    domElem.addEventListener('touchmove', e => {
+      if (e.touches.length === 2 && state.mode === 'orbit' && pinchStartDist) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        orbit.spherical.radius = Math.max(6, Math.min(240, pinchStartRadius * (pinchStartDist / Math.max(20, dist))));
+        updateOrbitCamera();
+      }
+    }, { passive: false });
+
+    domElem.addEventListener('touchend', () => { pinchStartDist = null; });
+
     domElem.addEventListener('pointerdown', e => {
-      orbit.flyAnim = null; orbit.prevX = e.clientX; orbit.prevY = e.clientY;
-      if (e.button === 2 || e.shiftKey) orbit.isPanning = true; else orbit.isDragging = true;
-    });
-    window.addEventListener('pointermove', e => {
-      if (!orbit.isDragging && !orbit.isPanning) return;
-      const dx = e.clientX - orbit.prevX, dy = e.clientY - orbit.prevY;
+      if (activeLookPointerId !== null) return;
+      activeLookPointerId = e.pointerId;
+      orbit.flyAnim = null;
       orbit.prevX = e.clientX; orbit.prevY = e.clientY;
-      if (state.mode === 'walk') { if (state.isDriving) drivableCar.rotY -= dx * 0.0055; else character.rotY -= dx * 0.0065; return; }
-      if (orbit.isDragging) { orbit.spherical.theta -= dx * 0.0065; orbit.spherical.phi -= dy * 0.0055; updateOrbitCamera(); }
-      else if (orbit.isPanning) {
+      if (e.button === 2 || e.shiftKey) orbit.isPanning = true; else orbit.isDragging = true;
+
+      const info = {
+        id: e.pointerId,
+        button: e.button,
+        startX: e.clientX,
+        startY: e.clientY,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        startTime: performance.now(),
+        moved: false,
+        brokeByHold: false,
+        holdTimer: null
+      };
+
+      // In iPad Minecraft Touch mode (only in 'mc' mode), holding finger still on screen for 420ms breaks the block!
+      if (e.button === 0 && state.mode === 'mc') {
+        touchRingEl.style.left = `${e.clientX}px`;
+        touchRingEl.style.top = `${e.clientY}px`;
+        info.holdTimer = setTimeout(() => {
+          if (!info.moved && activeLookPointerId === e.pointerId && state.mode === 'mc') {
+            info.brokeByHold = true;
+            touchRingEl.style.transform = 'translate(-50%, -50%) scale(1.15)';
+            const ndcX = (info.startX / window.innerWidth) * 2 - 1;
+            const ndcY = -(info.startY / window.innerHeight) * 2 + 1;
+            const hit = state.touchAimMode === 'tap'
+              ? computeVoxelRaycastFromNDC(ndcX, ndcY, 160)
+              : computeVoxelRaycastFromNDC(0, 0, 24);
+            triggerBreakAtAim(hit);
+            setTimeout(() => { touchRingEl.style.transform = 'translate(-50%, -50%) scale(0)'; }, 140);
+          }
+        }, 420);
+      }
+      pointerDownInfo = info;
+    });
+
+    window.addEventListener('pointermove', e => {
+      if (e.pointerId !== activeLookPointerId || !pointerDownInfo) return;
+      const dx = e.clientX - pointerDownInfo.lastX;
+      const dy = e.clientY - pointerDownInfo.lastY;
+      pointerDownInfo.lastX = e.clientX;
+      pointerDownInfo.lastY = e.clientY;
+
+      if (Math.hypot(e.clientX - pointerDownInfo.startX, e.clientY - pointerDownInfo.startY) > 10) {
+        pointerDownInfo.moved = true;
+        if (pointerDownInfo.holdTimer) { clearTimeout(pointerDownInfo.holdTimer); pointerDownInfo.holdTimer = null; }
+        touchRingEl.style.transform = 'translate(-50%, -50%) scale(0)';
+      }
+
+      if (state.mode === 'walk' || state.mode === 'mc') {
+        if (state.isDriving) {
+          drivableCar.rotY -= dx * 0.0055;
+        } else {
+          character.rotY -= dx * 0.0062;
+          if (state.mode === 'mc') {
+            character.pitch = Math.max(-1.35, Math.min(1.25, character.pitch - dy * 0.0055));
+          } else {
+            character.pitch = 0;
+          }
+        }
+        return;
+      }
+
+      if (orbit.isDragging) {
+        orbit.spherical.theta -= dx * 0.0065;
+        orbit.spherical.phi -= dy * 0.0055;
+        updateOrbitCamera();
+      } else if (orbit.isPanning) {
         const panSpeed = orbit.spherical.radius * 0.0014;
         const forward = new THREE.Vector3(); camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
         const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
@@ -1369,65 +2648,334 @@
         updateOrbitCamera();
       }
     });
-    window.addEventListener('pointerup', () => { orbit.isDragging = false; orbit.isPanning = false; });
-    domElem.addEventListener('wheel', e => { e.preventDefault(); if (state.mode === 'orbit') { orbit.flyAnim = null; orbit.spherical.radius += e.deltaY * 0.065; updateOrbitCamera(); } }, { passive: false });
 
-    const keys = { w: false, a: false, s: false, d: false, q: false, e: false, space: false };
+    function handlePointerUpOrCancel(e) {
+      if (e.pointerId !== activeLookPointerId) return;
+      orbit.isDragging = false;
+      orbit.isPanning = false;
+      activeLookPointerId = null;
+      touchRingEl.style.transform = 'translate(-50%, -50%) scale(0)';
+
+      if (!pointerDownInfo) return;
+      if (pointerDownInfo.holdTimer) clearTimeout(pointerDownInfo.holdTimer);
+
+      const elapsed = performance.now() - pointerDownInfo.startTime;
+      if (state.mode === 'mc' && !pointerDownInfo.moved && !pointerDownInfo.brokeByHold && elapsed < 400) {
+        const ndcX = (pointerDownInfo.startX / window.innerWidth) * 2 - 1;
+        const ndcY = -(pointerDownInfo.startY / window.innerHeight) * 2 + 1;
+        const useTapRay = state.touchAimMode === 'tap';
+        const hit = useTapRay ? computeVoxelRaycastFromNDC(ndcX, ndcY, 160) : computeVoxelRaycastFromNDC(0, 0, 24);
+
+        if (pointerDownInfo.button === 2) {
+          triggerBreakAtAim(hit);
+        } else if (pointerDownInfo.button === 0) {
+          if (state.touchTapTool === 'break') triggerBreakAtAim(hit);
+          else triggerPlaceAtAim(hit);
+        }
+      }
+      pointerDownInfo = null;
+    }
+
+    window.addEventListener('pointerup', handlePointerUpOrCancel);
+    window.addEventListener('pointercancel', handlePointerUpOrCancel);
+    domElem.addEventListener('wheel', e => {
+      e.preventDefault();
+      if (state.mode === 'orbit') {
+        orbit.flyAnim = null;
+        orbit.spherical.radius += e.deltaY * 0.065;
+        updateOrbitCamera();
+      } else if (state.mode === 'mc') {
+        // Mouse wheel scrolls hotbar in Minecraft mode!
+        const dir = e.deltaY > 0 ? 1 : -1;
+        selectHotbarSlot((state.activeHotbarIndex + dir + 9) % 9);
+      }
+    }, { passive: false });
 
     function toggleCarDriving() {
+      const walkTitleEl = document.getElementById('walk-hud-mode-title');
       if (state.isDriving) {
         state.isDriving = false;
         character.x = drivableCar.x - Math.cos(drivableCar.rotY) * 2.4;
         character.z = drivableCar.z + Math.sin(drivableCar.rotY) * 2.4;
-        character.y = 0; character.rotY = drivableCar.rotY; character.group.visible = true;
-        document.getElementById('hud-mode-title').textContent = '🎮 人物走動控制';
+        character.y = 0; character.rotY = drivableCar.rotY; character.group.visible = state.walkPov === 'third';
+        document.getElementById('hud-mode-title').textContent = '🕹️ 搖桿移動';
+        if (walkTitleEl) walkTitleEl.textContent = '🎮 人物走動控制';
       } else {
-        if (state.mode !== 'walk') setNavigationMode('walk');
-        state.isDriving = true; character.targetFloor = 1; character.group.visible = false;
-        document.getElementById('hud-mode-title').textContent = '🚗 黑色轎車駕駛模式';
+        if (state.mode === 'orbit') setNavigationMode('walk');
+        state.isDriving = true; state.isFlying = false; updateFlyButtonUI();
+        character.targetFloor = 1; character.group.visible = false;
+        document.getElementById('hud-mode-title').textContent = '🚗 轎車駕駛中';
+        if (walkTitleEl) walkTitleEl.textContent = '🚗 轎車駕駛控制';
       }
       updateCharacterFloorBadge();
     }
     document.getElementById('btn-toggle-drive').addEventListener('click', toggleCarDriving);
 
+    function toggleCreativeFly() {
+      if (state.isDriving || state.mode !== 'mc') return;
+      state.isFlying = !state.isFlying;
+      if (state.isFlying) {
+        character.vy = 0;
+        character.onGround = false;
+        if (character.y < 1.5) character.y += 1.5;
+      }
+      updateFlyButtonUI();
+      updateCharacterFloorBadge();
+    }
+
+    function updateFlyButtonUI() {
+      const btn = document.getElementById('pad-fly-toggle');
+      if (btn) {
+        btn.textContent = state.isFlying ? '🕊️ 飛行：開' : '🕊️ 飛行：關';
+        btn.className = state.isFlying
+          ? 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-sky-500 text-slate-950 border-2 border-sky-200 shadow-lg'
+          : 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-900/90 border-2 border-sky-400/80 text-sky-300 shadow-lg backdrop-blur';
+      }
+      const topFlyBtn = document.getElementById('btn-top-fly-toggle');
+      if (topFlyBtn) {
+        topFlyBtn.textContent = state.isFlying ? '🕊️ 飛行:開' : '🕊️ 飛行:關';
+        topFlyBtn.className = state.isFlying
+          ? 'px-2 py-1 rounded-xl text-[11px] font-extrabold bg-sky-500 text-slate-950 border border-sky-200 shadow transition shrink-0 whitespace-nowrap'
+          : 'px-2 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800 hover:bg-slate-700 border border-sky-400/60 text-sky-300 shadow transition shrink-0 whitespace-nowrap';
+      }
+      const pcFlyBtn = document.getElementById('pc-btn-fly-toggle');
+      if (pcFlyBtn) {
+        pcFlyBtn.textContent = state.isFlying ? '🕊️ 飛行(G)：開' : '🕊️ 飛行(G)：關';
+        pcFlyBtn.className = state.isFlying
+          ? 'px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-sky-500 text-slate-950 border border-sky-200 shadow transition'
+          : 'px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-300 transition';
+      }
+    }
+    document.getElementById('pad-fly-toggle').addEventListener('click', toggleCreativeFly);
+    document.getElementById('btn-top-fly-toggle').addEventListener('click', toggleCreativeFly);
+    document.getElementById('pc-btn-fly-toggle').addEventListener('click', toggleCreativeFly);
+
+    function updateSprintButtonUI() {
+      const btn = document.getElementById('pad-sprint');
+      if (btn) {
+        btn.textContent = state.sprint ? '⚡ 跑步：開' : '⚡ 跑步：關';
+        btn.className = state.sprint
+          ? 'px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-emerald-500 text-slate-950 border border-emerald-200 shadow'
+          : 'px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800/85 border border-slate-500/70 text-amber-300 shadow backdrop-blur';
+      }
+      const pcSprintBtn = document.getElementById('pc-btn-sprint-toggle');
+      if (pcSprintBtn) {
+        pcSprintBtn.textContent = state.sprint ? '⚡ 跑步(Shift)：開' : '⚡ 跑步(Shift)：關';
+        pcSprintBtn.className = state.sprint
+          ? 'px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-emerald-500 text-slate-950 border border-emerald-200 shadow transition'
+          : 'px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 transition';
+      }
+      const walkSprintBtn = document.getElementById('walk-pad-sprint');
+      if (walkSprintBtn) {
+        walkSprintBtn.textContent = state.sprint ? '⚡ 跑步：開' : '⚡ 跑步：關';
+        walkSprintBtn.className = state.sprint
+          ? 'py-1.5 rounded-xl bg-emerald-600 text-xs font-bold text-white shadow'
+          : 'py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-xs font-bold text-white';
+      }
+    }
+    document.getElementById('pad-sprint').addEventListener('click', () => { state.sprint = !state.sprint; updateSprintButtonUI(); });
+    document.getElementById('pc-btn-sprint-toggle').addEventListener('click', () => { state.sprint = !state.sprint; updateSprintButtonUI(); });
+    document.getElementById('walk-pad-sprint').addEventListener('click', () => { state.sprint = !state.sprint; updateSprintButtonUI(); });
+    document.getElementById('pc-btn-place').addEventListener('click', () => triggerPlaceAtAim());
+    document.getElementById('pc-btn-break').addEventListener('click', () => triggerBreakAtAim());
+
+    // 原版「人物自由走動」專屬控制面板 (#walk-hud) 按鈕事件綁定
+    [['walk-pad-w', 'w'], ['walk-pad-s', 's'], ['walk-pad-a', 'a'], ['walk-pad-d', 'd'], ['walk-pad-q', 'q'], ['walk-pad-e', 'e']].forEach(([id, k]) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        if (state.mode === 'orbit') setNavigationMode('walk');
+        keys[k] = true;
+      });
+      btn.addEventListener('pointerup', () => { keys[k] = false; });
+      btn.addEventListener('pointerleave', () => { keys[k] = false; });
+    });
+    document.getElementById('walk-pad-jump').addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (character.onGround && !state.isDriving) {
+        character.vy = 8.2;
+        character.onGround = false;
+      }
+    });
+
+    // iPad D-Pad Multi-Touch Slide Support (手指在十字鍵上滑動即可流暢連按與斜向移動)
+    const dpadGridEl = document.getElementById('mc-dpad-grid');
+    let dpadTouchId = null;
+
+    function applyDpadCode(code) {
+      keys.w = false; keys.s = false; keys.a = false; keys.d = false; keys.q = false; keys.e = false;
+      dpadGridEl.querySelectorAll('.mc-dpad-btn').forEach(b => b.classList.remove('pressed'));
+      if (!code) return;
+      if (code.includes('w')) keys.w = true;
+      if (code.includes('s')) keys.s = true;
+      if (code.includes('a')) keys.a = true;
+      if (code.includes('d')) keys.d = true;
+      if (code.includes('q')) keys.q = true;
+      if (code.includes('e')) keys.e = true;
+      const btn = dpadGridEl.querySelector(`[data-dpad="${code}"]`);
+      if (btn) btn.classList.add('pressed');
+    }
+
+    dpadGridEl.addEventListener('pointerdown', e => {
+      const btn = e.target.closest('[data-dpad]');
+      if (!btn) return;
+      e.preventDefault(); e.stopPropagation();
+      dpadTouchId = e.pointerId;
+      applyDpadCode(btn.getAttribute('data-dpad'));
+    });
+
+    window.addEventListener('pointermove', e => {
+      if (e.pointerId !== dpadTouchId) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const btn = el ? el.closest('[data-dpad]') : null;
+      applyDpadCode(btn ? btn.getAttribute('data-dpad') : null);
+    });
+
+    window.addEventListener('pointerup', e => {
+      if (e.pointerId === dpadTouchId) {
+        dpadTouchId = null;
+        applyDpadCode(null);
+      }
+    });
+    window.addEventListener('pointercancel', e => {
+      if (e.pointerId === dpadTouchId) {
+        dpadTouchId = null;
+        applyDpadCode(null);
+      }
+    });
+
+    // Center Jump / Double-Tap to Fly Button on D-Pad
+    let lastJumpTapTime = 0;
+    function triggerJumpOrFlyTap() {
+      const now = performance.now();
+      if (now - lastJumpTapTime < 320) {
+        toggleCreativeFly();
+        lastJumpTapTime = 0;
+        return;
+      }
+      lastJumpTapTime = now;
+      if (state.isFlying) {
+        character.y += 1.2;
+      } else if (character.onGround && !state.isDriving) {
+        character.vy = 8.2;
+        character.onGround = false;
+      }
+    }
+    document.getElementById('pad-center-jump').addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      triggerJumpOrFlyTap();
+    });
+
+    // Right-Side Fly Up / Jump & Fly Down Buttons
+    const flyUpBtn = document.getElementById('pad-fly-up');
+    const flyDownBtn = document.getElementById('pad-fly-down');
+    flyUpBtn.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      keys.flyUp = true;
+      if (!state.isFlying && character.onGround && !state.isDriving) {
+        character.vy = 8.2; character.onGround = false;
+      }
+    });
+    flyUpBtn.addEventListener('pointerup', () => { keys.flyUp = false; });
+    flyUpBtn.addEventListener('pointerleave', () => { keys.flyUp = false; });
+
+    flyDownBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); keys.flyDown = true; });
+    flyDownBtn.addEventListener('pointerup', () => { keys.flyDown = false; });
+    flyDownBtn.addEventListener('pointerleave', () => { keys.flyDown = false; });
+
+    // Dedicated iPad Action Buttons: Place Block & Break Block
+    document.getElementById('btn-mc-place').addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      triggerPlaceAtAim();
+    });
+    document.getElementById('btn-mc-break').addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      triggerBreakAtAim();
+    });
+
+    // PC Keyboard Controls (支援麥塊建造模式與人物自由走動模式完整鍵盤操作)
+    let lastSpaceKeyTapTime = 0;
     window.addEventListener('keydown', e => {
-      if (document.activeElement && document.activeElement.id === 'search-input') return;
+      if (document.activeElement && (document.activeElement.id === 'search-input' || document.activeElement.id === 'mc-json-textarea')) return;
+      if (state.mode === 'mc' && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoLastVoxelAction(); return; }
       const k = e.key.toLowerCase();
-      if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
-      if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+      if (state.mode === 'mc' && k >= '1' && k <= '9') { selectHotbarSlot(parseInt(k, 10) - 1); return; }
+
+      if (k === 'w') keys.w = true;
+      if (k === 's') keys.s = true;
       if (k === 'a') keys.a = true;
       if (k === 'd') keys.d = true;
-      if (k === 'q' || e.key === 'ArrowLeft') keys.q = true;
-      if (k === 'e' || e.key === 'ArrowRight') keys.e = true;
-      if (k === 'f' && (state.isDriving || Math.hypot(character.x - drivableCar.x, character.z - drivableCar.z) <= 9.5)) toggleCarDriving();
-      if (e.key === ' ' && character.onGround && state.mode === 'walk' && !state.isDriving) { character.vy = 7.2; character.onGround = false; }
-      if (e.key === 'Shift') { state.sprint = !state.sprint; updateSprintButtonUI(); }
+      if (k === 'q' || e.key === 'ArrowLeft') { e.preventDefault(); keys.q = true; }
+      if (k === 'e' || e.key === 'ArrowRight') { e.preventDefault(); keys.e = true; }
+
+      if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        if (state.mode === 'mc' && !state.isDriving) keys.pitchUp = true;
+        else keys.w = true;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        if (state.mode === 'mc' && !state.isDriving) keys.pitchDown = true;
+        else keys.s = true;
+      }
+
+      if (state.mode === 'mc') {
+        if (k === 'r' || e.key === 'Enter') { e.preventDefault(); triggerPlaceAtAim(); }
+        if (k === 'x' || e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); triggerBreakAtAim(); }
+        if (k === 'g' && !e.repeat) toggleCreativeFly();
+        if (k === 'c') keys.flyDown = true;
+        if (k === 'b' && !e.repeat) {
+          const invEl = document.getElementById('mc-inventory-modal');
+          if (invEl.classList.contains('hidden')) { renderHotbarAndInventoryUI(); invEl.classList.remove('hidden'); }
+          else invEl.classList.add('hidden');
+        }
+        if (k === 'v' && !e.repeat) {
+          state.walkPov = state.walkPov === 'third' ? 'first' : 'third';
+          document.getElementById('btn-walk-pov').textContent = state.walkPov === 'third' ? '👁️ 第三人稱' : '👁️ 第一人稱';
+        }
+        if (k === 'h' && !e.repeat) {
+          document.getElementById('mc-help-modal').classList.toggle('hidden');
+        }
+      }
+
+      if (k === 'f' && !e.repeat && (state.isDriving || Math.hypot(character.x - drivableCar.x, character.z - drivableCar.z) <= 9.5)) toggleCarDriving();
+
+      if (e.key === ' ') {
+        e.preventDefault();
+        keys.flyUp = true;
+        if (!e.repeat && state.mode === 'mc' && !state.isDriving) {
+          const now = performance.now();
+          if (now - lastSpaceKeyTapTime < 320) {
+            toggleCreativeFly();
+            lastSpaceKeyTapTime = 0;
+            return;
+          }
+          lastSpaceKeyTapTime = now;
+        }
+        if (!state.isFlying && character.onGround && (state.mode === 'walk' || state.mode === 'mc') && !state.isDriving) {
+          character.vy = 8.2;
+          character.onGround = false;
+        }
+      }
+      if (e.key === 'Shift') {
+        if (state.isFlying && state.mode === 'mc') keys.flyDown = true;
+        else if (!e.repeat) { state.sprint = !state.sprint; updateSprintButtonUI(); }
+      }
     });
     window.addEventListener('keyup', e => {
       const k = e.key.toLowerCase();
-      if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
-      if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+      if (k === 'w') keys.w = false;
+      if (k === 's') keys.s = false;
       if (k === 'a') keys.a = false;
       if (k === 'd') keys.d = false;
       if (k === 'q' || e.key === 'ArrowLeft') keys.q = false;
       if (k === 'e' || e.key === 'ArrowRight') keys.e = false;
+      if (e.key === 'ArrowUp' || e.key === 'PageUp') { keys.w = false; keys.pitchUp = false; }
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { keys.s = false; keys.pitchDown = false; }
+      if (e.key === ' ') keys.flyUp = false;
+      if (e.key === 'Shift' || k === 'c') keys.flyDown = false;
     });
-
-    ['w', 's', 'a', 'd', 'q', 'e'].forEach(k => {
-      const btn = document.getElementById(`pad-${k}`);
-      if (!btn) return;
-      btn.addEventListener('pointerdown', e => { e.preventDefault(); keys[k] = true; });
-      btn.addEventListener('pointerup', e => { e.preventDefault(); keys[k] = false; });
-      btn.addEventListener('pointerleave', e => { e.preventDefault(); keys[k] = false; });
-    });
-
-    document.getElementById('pad-jump').addEventListener('click', () => { if (character.onGround && !state.isDriving) { character.vy = 7.2; character.onGround = false; } });
-    function updateSprintButtonUI() {
-      const btn = document.getElementById('pad-sprint');
-      btn.textContent = state.sprint ? '⚡ 跑步：開' : '⚡ 跑步：關';
-      btn.className = state.sprint ? 'py-1.5 rounded-xl bg-emerald-600 text-xs font-bold text-white' : 'py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-xs font-bold text-white';
-    }
-    document.getElementById('pad-sprint').addEventListener('click', () => { state.sprint = !state.sprint; updateSprintButtonUI(); });
 
     const labelDomMap = new Map(), roadDomList = [];
     function init3DLabels() {
@@ -1497,11 +3045,16 @@
       badgeEl.className = `px-2.5 py-1 rounded-xl text-xs font-extrabold text-white shrink-0 ${poi.category === '1f' ? 'bg-slate-600' : poi.category === '2f' ? 'bg-pink-600' : poi.category === 'sport' ? 'bg-orange-600' : poi.category === 'eco' ? 'bg-emerald-600' : 'bg-blue-600'}`;
       document.getElementById('selected-title').textContent = poi.fullTitle;
       document.getElementById('selected-Zone').textContent = `${poi.zone}｜點擊右側按鈕可傳送人物至此走動`;
-      if (forceTeleportWalk || state.mode === 'walk') {
+      if (state.mode !== 'mc') {
+        document.getElementById('selected-banner').classList.remove('hidden');
+      }
+      if (forceTeleportWalk || state.mode === 'walk' || state.mode === 'mc') {
         if (state.isDriving) toggleCarDriving();
         teleportCharacterToPoi(poi);
-        if (forceTeleportWalk && state.mode !== 'walk') setNavigationMode('walk');
-      } else flyCameraTo(poi.x, poi.floor === 2 ? 6.0 : 2.0, poi.z, poi.camOffset);
+        if (forceTeleportWalk && state.mode === 'orbit') setNavigationMode('walk');
+      } else {
+        flyCameraTo(poi.x, poi.floor === 2 ? 6.0 : 2.0, poi.z, poi.camOffset);
+      }
       renderSidebarList();
     }
 
@@ -1517,27 +3070,153 @@
 
     function updateCharacterFloorBadge() {
       const el = document.getElementById('char-floor-indicator');
+      if (!el) return;
       if (state.isDriving) { el.textContent = '狀態：🚗 駕駛黑色轎車中'; el.className = 'px-2 py-0.5 rounded bg-amber-500/30 text-amber-200 font-bold'; }
+      else if (state.isFlying) { el.textContent = `狀態：🕊️ 創造飛行中 (高度 ${character.y.toFixed(1)}m)`; el.className = 'px-2 py-0.5 rounded bg-sky-500/30 text-sky-200 font-bold'; }
       else if (character.targetFloor === 2) { el.textContent = '位置：2F 二樓走廊'; el.className = 'px-2 py-0.5 rounded bg-pink-500/30 text-pink-200 font-bold'; }
       else if (character.targetFloor === 1.5) { el.textContent = '位置：0.5F 樓梯平台'; el.className = 'px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-200 font-bold'; }
       else { el.textContent = '位置：1F 走廊/戶外'; el.className = 'px-2 py-0.5 rounded bg-slate-700 text-amber-300 font-bold'; }
     }
 
+    function setMcControlScheme(scheme) {
+      state.mcControlScheme = scheme;
+      const schemeBtn = document.getElementById('btn-mc-control-scheme');
+      const toolbarSchemeBtn = document.getElementById('btn-toolbar-scheme-toggle');
+      const tabPc = document.getElementById('hud-tab-pc');
+      const tabTouch = document.getElementById('hud-tab-touch');
+      const pcContent = document.getElementById('mc-hud-pc-content');
+      const touchContent = document.getElementById('mc-hud-touch-content');
+      const dpadPanel = document.getElementById('mc-dpad-panel');
+      const actionPanel = document.getElementById('mc-action-panel');
+      const pcStatusBar = document.getElementById('mc-pc-status-bar');
+
+      if (scheme === 'pc') {
+        if (schemeBtn) {
+          schemeBtn.textContent = '💻 PC鍵盤(點開十字鍵)';
+          schemeBtn.className = 'px-2 py-1 rounded-xl text-[11px] font-extrabold bg-emerald-600 text-white border border-emerald-300 shadow transition shrink-0 whitespace-nowrap';
+        }
+        if (toolbarSchemeBtn) {
+          toolbarSchemeBtn.textContent = '📱 點此切換為「iPad 觸控模式」(顯示左手虛擬十字鍵)';
+        }
+        if (tabPc) tabPc.className = 'px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-emerald-600 text-white transition';
+        if (tabTouch) tabTouch.className = 'px-2 py-0.5 rounded-md text-[11px] font-extrabold text-slate-300 hover:text-white transition';
+        if (pcContent) pcContent.classList.remove('hidden');
+        if (touchContent) touchContent.classList.add('hidden');
+        if (state.mode === 'mc') {
+          if (dpadPanel) dpadPanel.classList.add('hidden');
+          if (actionPanel) actionPanel.classList.add('hidden');
+          if (pcStatusBar) pcStatusBar.classList.remove('hidden');
+        }
+      } else {
+        if (schemeBtn) {
+          schemeBtn.textContent = '📱 觸控十字鍵:開';
+          schemeBtn.className = 'px-2 py-1 rounded-xl text-[11px] font-extrabold bg-amber-500 text-slate-950 border border-amber-300 shadow transition shrink-0 whitespace-nowrap';
+        }
+        if (toolbarSchemeBtn) {
+          toolbarSchemeBtn.textContent = '💻 點此切換為「PC 鍵盤模式」(隱藏觸控十字鍵)';
+        }
+        if (tabTouch) tabTouch.className = 'px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500 text-slate-950 transition';
+        if (tabPc) tabPc.className = 'px-2 py-0.5 rounded-md text-[11px] font-extrabold text-slate-300 hover:text-white transition';
+        if (touchContent) touchContent.classList.remove('hidden');
+        if (pcContent) pcContent.classList.add('hidden');
+        if (state.mode === 'mc') {
+          if (dpadPanel) dpadPanel.classList.remove('hidden');
+          if (actionPanel) actionPanel.classList.remove('hidden');
+          if (pcStatusBar) pcStatusBar.classList.add('hidden');
+        }
+      }
+    }
+
     function setNavigationMode(mode) {
       state.mode = mode;
-      const orbitBtn = document.getElementById('mode-orbit-btn'), walkBtn = document.getElementById('mode-walk-btn');
-      const povBtn = document.getElementById('btn-walk-pov'), walkHud = document.getElementById('walk-hud');
-      if (mode === 'walk') {
-        walkBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-emerald-600 text-white shadow';
-        orbitBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white';
-        povBtn.classList.remove('hidden'); walkHud.classList.remove('hidden');
+      const orbitBtn = document.getElementById('mode-orbit-btn');
+      const walkBtn = document.getElementById('mode-walk-btn');
+      const mcBtn = document.getElementById('mode-mc-btn');
+      const headerBrandBox = document.getElementById('header-brand-box');
+      const headerTitleContent = document.getElementById('header-title-content');
+      const schemeBtn = document.getElementById('btn-mc-control-scheme');
+      const topFlyBtn = document.getElementById('btn-top-fly-toggle');
+      const povBtn = document.getElementById('btn-walk-pov');
+      const aimModeBtn = document.getElementById('btn-touch-aim-mode');
+      const undoBtn = document.getElementById('btn-mc-undo');
+      const dpadPanel = document.getElementById('mc-dpad-panel');
+      const hotbarWrapper = document.getElementById('mc-hotbar-wrapper');
+      const actionPanel = document.getElementById('mc-action-panel');
+      const pcStatusBar = document.getElementById('mc-pc-status-bar');
+      const crosshairEl = document.getElementById('mc-crosshair');
+      const walkHudEl = document.getElementById('walk-hud');
+      const selectedBannerEl = document.getElementById('selected-banner');
+
+      const inactiveBtnClass = 'px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 text-slate-300 hover:text-white whitespace-nowrap';
+      orbitBtn.className = inactiveBtnClass;
+      walkBtn.className = inactiveBtnClass;
+      mcBtn.className = inactiveBtnClass;
+
+      if (mode === 'mc') {
+        // ⛏️ 麥塊建造模式：自動收合左上角標題文字區塊（只保留漢堡選單按鈕），並依 iPad/PC 操作模式顯示對應介面
+        mcBtn.className = 'px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 bg-emerald-600 text-white shadow whitespace-nowrap';
+        if (headerTitleContent) headerTitleContent.classList.add('hidden');
+        if (headerBrandBox) headerBrandBox.className = 'glass-panel pointer-events-auto rounded-2xl p-1 flex items-center shadow-xl transition-all shrink-0';
+        if (schemeBtn) schemeBtn.classList.remove('hidden');
+        if (topFlyBtn) topFlyBtn.classList.remove('hidden');
+        povBtn.classList.remove('hidden');
+        aimModeBtn.classList.remove('hidden');
+        undoBtn.classList.remove('hidden');
+        if (hotbarWrapper) hotbarWrapper.classList.remove('hidden');
+        if (walkHudEl) walkHudEl.classList.add('hidden');
+        if (selectedBannerEl) selectedBannerEl.classList.add('hidden');
+        if (crosshairEl) crosshairEl.style.display = state.touchAimMode === 'crosshair' ? 'block' : 'none';
+        setMcControlScheme(state.mcControlScheme);
+      } else if (mode === 'walk') {
+        // 🚶 原版「人物自由走動」模式：展開左上角標題區塊，僅供自由走動與開車，隱藏所有麥塊建造介面與黑框
+        walkBtn.className = 'px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 bg-amber-600 text-white shadow whitespace-nowrap';
+        if (headerTitleContent) headerTitleContent.classList.remove('hidden');
+        if (headerBrandBox) headerBrandBox.className = 'glass-panel pointer-events-auto rounded-2xl px-3 py-1.5 flex items-center gap-2.5 shadow-xl transition-all shrink-0';
+        state.isFlying = false;
+        updateFlyButtonUI();
+        character.pitch = 0;
+        state.walkPov = 'third';
+        povBtn.textContent = '👁️ 第三人稱';
+        if (schemeBtn) schemeBtn.classList.add('hidden');
+        if (topFlyBtn) topFlyBtn.classList.add('hidden');
+        povBtn.classList.remove('hidden');
+        aimModeBtn.classList.add('hidden');
+        undoBtn.classList.add('hidden');
+        if (dpadPanel) dpadPanel.classList.add('hidden');
+        if (hotbarWrapper) hotbarWrapper.classList.add('hidden');
+        if (actionPanel) actionPanel.classList.add('hidden');
+        if (pcStatusBar) pcStatusBar.classList.add('hidden');
+        if (walkHudEl) walkHudEl.classList.remove('hidden');
+        if (selectedBannerEl) selectedBannerEl.classList.remove('hidden');
+        if (crosshairEl) crosshairEl.style.display = 'none';
+        highlightGroup.visible = false;
+        fpHandGroup.visible = false;
       } else {
+        // 🦅 自由查看設施 (鳥瞰模式)：展開左上角標題區塊，隱藏所有麥塊建造介面與人物控制面板
         if (state.isDriving) toggleCarDriving();
-        orbitBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow';
-        walkBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white';
-        povBtn.classList.add('hidden'); walkHud.classList.add('hidden');
-        orbit.target.set(character.x, character.y + 1.8, character.z); updateOrbitCamera();
+        state.isFlying = false;
+        updateFlyButtonUI();
+        orbitBtn.className = 'px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 bg-indigo-600 text-white shadow whitespace-nowrap';
+        if (headerTitleContent) headerTitleContent.classList.remove('hidden');
+        if (headerBrandBox) headerBrandBox.className = 'glass-panel pointer-events-auto rounded-2xl px-3 py-1.5 flex items-center gap-2.5 shadow-xl transition-all shrink-0';
+        if (schemeBtn) schemeBtn.classList.add('hidden');
+        if (topFlyBtn) topFlyBtn.classList.add('hidden');
+        povBtn.classList.add('hidden');
+        aimModeBtn.classList.add('hidden');
+        undoBtn.classList.add('hidden');
+        if (dpadPanel) dpadPanel.classList.add('hidden');
+        if (hotbarWrapper) hotbarWrapper.classList.add('hidden');
+        if (actionPanel) actionPanel.classList.add('hidden');
+        if (pcStatusBar) pcStatusBar.classList.add('hidden');
+        if (walkHudEl) walkHudEl.classList.add('hidden');
+        if (selectedBannerEl) selectedBannerEl.classList.remove('hidden');
+        if (crosshairEl) crosshairEl.style.display = 'none';
+        highlightGroup.visible = false;
+        fpHandGroup.visible = false;
+        orbit.target.set(character.x, character.y + 1.8, character.z);
+        updateOrbitCamera();
       }
+      updateCharacterFloorBadge();
     }
 
     const minimapCanvas = document.getElementById('minimap-canvas'), mCtx = minimapCanvas.getContext('2d');
@@ -1576,6 +3255,13 @@
       drawRectWorld(39, -23.5, 108, 19, '#94a3b8', '#334155', '教學大樓');
       drawRectWorld(31, 11, 20, 49, '#94a3b8', '#334155', '辦公樓');
 
+      // 在雷達圖上繪製玩家建造的麥塊方塊位置
+      mCtx.fillStyle = '#f59e0b';
+      placedBlocksMap.forEach(b => {
+        const [bx, bz] = worldToMinimap(b.gx + 0.5, b.gz + 0.5);
+        mCtx.fillRect(bx - 1.2, bz - 1.2, 2.4, 2.4);
+      });
+
       const px = state.isDriving ? drivableCar.x : character.x, pz = state.isDriving ? drivableCar.z : character.z, pr = state.isDriving ? drivableCar.rotY : character.rotY;
       const [cx, cz] = worldToMinimap(px, pz);
       mCtx.save(); mCtx.translate(cx, cz); mCtx.rotate(-pr + Math.PI);
@@ -1592,27 +3278,201 @@
         const d2 = (poi.x - wx) ** 2 + (poi.z - wz) ** 2;
         if (d2 < bestDist) { bestDist = d2; nearest = poi; }
       });
-      if (nearest) selectPoi(nearest.id, false);
+      if (nearest) selectPoi(nearest.id, true);
     });
 
     document.getElementById('mode-orbit-btn').addEventListener('click', () => setNavigationMode('orbit'));
     document.getElementById('mode-walk-btn').addEventListener('click', () => setNavigationMode('walk'));
+    document.getElementById('mode-mc-btn').addEventListener('click', () => setNavigationMode('mc'));
+    document.getElementById('btn-mc-control-scheme').addEventListener('click', () => {
+      setMcControlScheme(state.mcControlScheme === 'pc' ? 'touch' : 'pc');
+    });
+    document.getElementById('btn-toolbar-scheme-toggle').addEventListener('click', () => {
+      setMcControlScheme(state.mcControlScheme === 'pc' ? 'touch' : 'pc');
+    });
+    document.getElementById('hud-tab-pc').addEventListener('click', () => setMcControlScheme('pc'));
+    document.getElementById('hud-tab-touch').addEventListener('click', () => setMcControlScheme('touch'));
     document.getElementById('btn-walk-pov').addEventListener('click', e => {
       state.walkPov = state.walkPov === 'third' ? 'first' : 'third';
-      e.currentTarget.textContent = state.walkPov === 'third' ? '視角：第三人稱' : '視角：第一人稱';
+      e.currentTarget.textContent = state.walkPov === 'third' ? '👁️ 第三人稱' : '👁️ 第一人稱';
+    });
+
+    // 觸控準星模式 vs 直接點擊模式切換
+    document.getElementById('btn-touch-aim-mode').addEventListener('click', e => {
+      state.touchAimMode = state.touchAimMode === 'crosshair' ? 'tap' : 'crosshair';
+      e.currentTarget.textContent = state.touchAimMode === 'crosshair' ? '🎯 準星' : '👆 點選建造';
+      const crosshairEl = document.getElementById('mc-crosshair');
+      if (crosshairEl) crosshairEl.style.display = (state.mode === 'mc' && state.touchAimMode === 'crosshair') ? 'block' : 'none';
+    });
+
+    // 點擊畫面工具切換 (建造 vs 挖掘)
+    document.getElementById('btn-touch-tool-toggle').addEventListener('click', e => {
+      state.touchTapTool = state.touchTapTool === 'place' ? 'break' : 'place';
+      if (state.touchTapTool === 'place') {
+        e.currentTarget.textContent = '點擊畫面：🧱 放置';
+        e.currentTarget.className = 'px-2.5 py-0.5 rounded-full bg-emerald-600/90 border border-emerald-300/80 text-[11px] font-extrabold text-white shadow-lg';
+      } else {
+        e.currentTarget.textContent = '點擊畫面：⛏️ 挖掘';
+        e.currentTarget.className = 'px-2.5 py-0.5 rounded-full bg-rose-600/90 border border-rose-300/80 text-[11px] font-extrabold text-white shadow-lg';
+      }
+    });
+
+    document.getElementById('btn-mc-undo').addEventListener('click', () => undoLastVoxelAction());
+    document.getElementById('btn-sound-toggle').addEventListener('click', e => {
+      state.soundEnabled = !state.soundEnabled;
+      e.currentTarget.textContent = state.soundEnabled ? '🔊' : '🔇';
+    });
+
+    // 畫面左下角獨立「存檔及操作說明」工具列收合/展開與視窗控制
+    const helpModalEl = document.getElementById('mc-help-modal');
+    const blToolbarPanelEl = document.getElementById('bl-toolbar-panel');
+    const blToolbarBtnTextEl = document.getElementById('bl-toolbar-btn-text');
+
+    function setBottomLeftToolbarOpen(isOpen) {
+      state.blToolbarOpen = isOpen;
+      if (blToolbarPanelEl) blToolbarPanelEl.classList.toggle('hidden', !isOpen);
+      if (blToolbarBtnTextEl) blToolbarBtnTextEl.textContent = isOpen ? '存檔 / 操作說明 ▼' : '存檔 / 操作說明 ▲';
+    }
+
+    document.getElementById('btn-toggle-bl-toolbar').addEventListener('click', () => {
+      setBottomLeftToolbarOpen(!state.blToolbarOpen);
+    });
+    document.getElementById('btn-close-bl-toolbar').addEventListener('click', () => {
+      setBottomLeftToolbarOpen(false);
+    });
+    document.getElementById('btn-open-help-modal').addEventListener('click', () => helpModalEl.classList.remove('hidden'));
+    document.getElementById('btn-hud-open-full-help').addEventListener('click', () => helpModalEl.classList.remove('hidden'));
+    document.getElementById('btn-close-help-modal').addEventListener('click', () => helpModalEl.classList.add('hidden'));
+    helpModalEl.addEventListener('click', e => { if (e.target === helpModalEl) helpModalEl.classList.add('hidden'); });
+
+    // 方塊背包視窗開關
+    const invModalEl = document.getElementById('mc-inventory-modal');
+    document.getElementById('btn-open-inventory').addEventListener('click', () => {
+      renderHotbarAndInventoryUI();
+      invModalEl.classList.remove('hidden');
+    });
+    document.getElementById('btn-close-inventory').addEventListener('click', () => invModalEl.classList.add('hidden'));
+    invModalEl.addEventListener('click', e => { if (e.target === invModalEl) invModalEl.classList.add('hidden'); });
+
+    // 本地儲存、匯出與匯入管理視窗
+    const saveModalEl = document.getElementById('mc-save-modal');
+    document.getElementById('btn-open-save-modal').addEventListener('click', () => {
+      renderSaveSlotsUI();
+      document.getElementById('mc-json-textarea').value = JSON.stringify(serializePlacedBlocks());
+      document.getElementById('save-modal-status').textContent = `目前地圖共有 ${placedBlocksMap.size} 個自建方塊（已自動儲存於瀏覽器本地空間）`;
+      saveModalEl.classList.remove('hidden');
+    });
+    document.getElementById('btn-close-save-modal').addEventListener('click', () => saveModalEl.classList.add('hidden'));
+    saveModalEl.addEventListener('click', e => { if (e.target === saveModalEl) saveModalEl.classList.add('hidden'); });
+
+    // 匯出 JSON 檔案
+    document.getElementById('btn-export-json-file').addEventListener('click', () => {
+      const dataStr = JSON.stringify(serializePlacedBlocks(), null, 2);
+      document.getElementById('mc-json-textarea').value = dataStr;
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateTag = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      a.href = url;
+      a.download = `成功國小3D麥塊作品_${dateTag}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      document.getElementById('save-modal-status').textContent = `✅ 已匯出下載 JSON 檔案（共 ${placedBlocksMap.size} 個方塊）！`;
+    });
+
+    // 複製 JSON 文字碼
+    document.getElementById('btn-copy-json-text').addEventListener('click', async () => {
+      const dataStr = JSON.stringify(serializePlacedBlocks());
+      const ta = document.getElementById('mc-json-textarea');
+      ta.value = dataStr;
+      ta.select();
+      try {
+        await navigator.clipboard.writeText(dataStr);
+        document.getElementById('save-modal-status').textContent = '✅ 已複製作品 JSON 代碼至剪貼簿！可直接貼給其他同學匯入。';
+      } catch (e) {
+        document.getElementById('save-modal-status').textContent = '✅ 已全選下方文字框代碼，請長按選擇「拷貝」！';
+      }
+    });
+
+    // 匯入 JSON 檔案
+    const fileInputEl = document.getElementById('input-import-json-file');
+    document.getElementById('btn-trigger-import-file').addEventListener('click', () => fileInputEl.click());
+    fileInputEl.addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const parsed = JSON.parse(String(ev.target.result));
+          const modeRadio = document.querySelector('input[name="import-mode"]:checked');
+          const isMerge = modeRadio && modeRadio.value === 'merge';
+          if (loadSerializedBlocks(parsed, isMerge)) {
+            playMcSound('place');
+            document.getElementById('mc-json-textarea').value = JSON.stringify(serializePlacedBlocks());
+            document.getElementById('save-modal-status').textContent = `🎉 成功從檔案匯入作品！目前地圖共有 ${placedBlocksMap.size} 個方塊。`;
+          } else {
+            document.getElementById('save-modal-status').textContent = '⚠️ 檔案格式不正確，找不到 blocks 方塊陣列。';
+          }
+        } catch (err) {
+          document.getElementById('save-modal-status').textContent = '⚠️ 讀取 JSON 檔案失敗，請確認檔案格式。';
+        }
+        fileInputEl.value = '';
+      };
+      reader.readAsText(file);
+    });
+
+    // 從文字框貼上匯入
+    document.getElementById('btn-import-from-textarea').addEventListener('click', () => {
+      const raw = document.getElementById('mc-json-textarea').value.trim();
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        const modeRadio = document.querySelector('input[name="import-mode"]:checked');
+        const isMerge = modeRadio && modeRadio.value === 'merge';
+        if (loadSerializedBlocks(parsed, isMerge)) {
+          playMcSound('place');
+          document.getElementById('save-modal-status').textContent = `🎉 成功從文字碼匯入作品！目前地圖共有 ${placedBlocksMap.size} 個方塊。`;
+        } else {
+          document.getElementById('save-modal-status').textContent = '⚠️ 代碼格式不正確，找不到 blocks 資料。';
+        }
+      } catch (err) {
+        document.getElementById('save-modal-status').textContent = '⚠️ JSON 語法解析失敗，請確認貼上的文字是否完整。';
+      }
+    });
+
+    // 載入示範作品與清空方塊
+    document.getElementById('btn-load-demo-build').addEventListener('click', () => {
+      buildStarterDemoCreation(true);
+      document.getElementById('mc-json-textarea').value = JSON.stringify(serializePlacedBlocks());
+      document.getElementById('save-modal-status').textContent = '🏰 已在中庭生態池旁載入「紫蝶拱門與麥塊木亭」示範建築！';
+    });
+
+    document.getElementById('btn-clear-all-blocks').addEventListener('click', () => {
+      placedBlocksMap.forEach(entry => groupVoxelBlocks.remove(entry.mesh));
+      placedBlocksMap.clear();
+      columnTopMap.clear();
+      undoStack.length = 0;
+      autoSaveBlocksToLocal();
+      updateBlockCountBadge();
+      playMcSound('break');
+      document.getElementById('mc-json-textarea').value = JSON.stringify(serializePlacedBlocks());
+      document.getElementById('save-modal-status').textContent = '🗑️ 已清空地圖上所有自建方塊。';
     });
 
     function syncLabelButtonsUI() {
       const subBtn = document.getElementById('btn-toggle-sublabels'), hideBtn = document.getElementById('btn-hide-all-labels');
+      if (!subBtn || !hideBtn) return;
       if (state.hideAllLabels) {
-        subBtn.textContent = '🏷️ 標籤：已全關'; hideBtn.textContent = '👁️ 顯示文字標籤';
+        subBtn.textContent = '🏷️ 標籤:關'; hideBtn.textContent = '👁️ 顯示所有標籤';
       } else {
-        subBtn.textContent = state.showSubLabels ? '🏷️ 全部標籤：開' : '🏷️ 僅主教室標籤'; hideBtn.textContent = '🚫 關閉所有標籤';
+        subBtn.textContent = state.showSubLabels ? '🏷️ 標籤:全' : '🏷️ 標籤:主'; hideBtn.textContent = '🚫 關閉所有標籤';
       }
     }
     document.getElementById('btn-toggle-sublabels').addEventListener('click', () => {
-      if (state.hideAllLabels) { state.hideAllLabels = false; state.showSubLabels = true; }
-      else if (state.showSubLabels) state.showSubLabels = false;
+      if (state.hideAllLabels) { state.hideAllLabels = false; state.showSubLabels = false; }
+      else if (!state.showSubLabels) state.showSubLabels = true;
       else state.hideAllLabels = true;
       syncLabelButtonsUI();
     });
@@ -1621,20 +3481,27 @@
     document.getElementById('btn-time-of-day').addEventListener('click', e => {
       if (state.timeOfDay === 'day') {
         state.timeOfDay = 'sunset'; scene.background.setHex(0xfed7aa); scene.fog.color.setHex(0xfed7aa);
-        sunLight.color.setHex(0xfb923c); e.currentTarget.textContent = '🌅 溫暖夕陽';
+        sunLight.color.setHex(0xfb923c); e.currentTarget.textContent = '🌅';
       } else if (state.timeOfDay === 'sunset') {
         state.timeOfDay = 'night'; scene.background.setHex(0x0f172a); scene.fog.color.setHex(0x0f172a);
-        sunLight.color.setHex(0x93c5fd); sunLight.intensity = 0.45; e.currentTarget.textContent = '🌙 靜謐星夜';
+        sunLight.color.setHex(0x93c5fd); sunLight.intensity = 0.45; e.currentTarget.textContent = '🌙';
       } else {
         state.timeOfDay = 'day'; scene.background.setHex(0xbae6fd); scene.fog.color.setHex(0xbae6fd);
-        sunLight.color.setHex(0xfffbeb); sunLight.intensity = 1.05; e.currentTarget.textContent = '☀️ 晴朗日間';
+        sunLight.color.setHex(0xfffbeb); sunLight.intensity = 1.05; e.currentTarget.textContent = '☀️';
       }
     });
 
     document.getElementById('btn-reset-camera').addEventListener('click', () => { setNavigationMode('orbit'); flyCameraTo(0, 2, 10, [-22, 34, 58]); });
     document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
       state.sidebarOpen = !state.sidebarOpen;
-      document.getElementById('sidebar-panel').style.transform = state.sidebarOpen ? 'translateX(0)' : 'translateX(-110%)';
+      document.getElementById('sidebar-panel').style.transform = state.sidebarOpen ? 'translateX(0)' : 'translateX(-115%)';
+    });
+    document.getElementById('btn-close-sidebar').addEventListener('click', () => {
+      state.sidebarOpen = false;
+      document.getElementById('sidebar-panel').style.transform = 'translateX(-115%)';
+    });
+    document.getElementById('btn-close-selected-banner').addEventListener('click', () => {
+      document.getElementById('selected-banner').classList.add('hidden');
     });
 
     document.querySelectorAll('.cat-tab').forEach(btn => {
@@ -1651,11 +3518,11 @@
 
     document.getElementById('btn-teleport-here').addEventListener('click', () => selectPoi(state.selectedPoiId, true));
     document.getElementById('btn-go-pond').addEventListener('click', () => selectPoi('eco-pond', true));
-    document.getElementById('btn-go-sunny').addEventListener('click', () => selectPoi('sp-sunnycourt', false));
+    document.getElementById('btn-go-sunny').addEventListener('click', () => selectPoi('sp-sunnycourt', true));
     document.getElementById('btn-go-car').addEventListener('click', () => selectPoi('gt-car-north', true));
     document.getElementById('btn-minimap-floor').addEventListener('click', e => {
       state.minimapFloor = state.minimapFloor === 1 ? 2 : 1;
-      e.currentTarget.textContent = `平面：${state.minimapFloor}F`;
+      e.currentTarget.textContent = `${state.minimapFloor}F`;
     });
     document.getElementById('btn-toggle-minimap').addEventListener('click', e => {
       state.minimapCollapsed = !state.minimapCollapsed;
@@ -1688,11 +3555,29 @@
         else tr.mesh.rotation.z = sway;
       });
 
+      // Update voxel block break/place particles
+      for (let i = blockParticles.length - 1; i >= 0; i--) {
+        const p = blockParticles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          blockParticles.splice(i, 1);
+        } else {
+          p.vy -= 14.0 * dt;
+          p.mesh.position.x += p.vx * dt;
+          p.mesh.position.y += p.vy * dt;
+          p.mesh.position.z += p.vz * dt;
+          p.mesh.rotation.x += 6 * dt;
+          p.mesh.rotation.y += 6 * dt;
+          p.mesh.scale.setScalar(Math.max(0.1, p.life * 2.2));
+        }
+      }
+
       const carBanner = document.getElementById('car-prompt-banner');
       const distToCar = Math.hypot(character.x - drivableCar.x, character.z - drivableCar.z);
       if (state.isDriving) {
         carBanner.classList.remove('hidden');
-        document.getElementById('car-prompt-text').textContent = '🚗 正在駕駛四輪黑色轎車（WASD 行駛、F 下車）';
+        document.getElementById('car-prompt-text').textContent = '🚗 正在駕駛四輪黑色轎車（搖桿/WASD 行駛、F 下車）';
         document.getElementById('btn-toggle-drive').textContent = '🚪 下車步行 (F)';
       } else if (distToCar <= 9.5 && character.targetFloor === 1) {
         carBanner.classList.remove('hidden');
@@ -1701,6 +3586,7 @@
       } else carBanner.classList.add('hidden');
 
       if (state.mode === 'orbit') {
+        fpHandGroup.visible = false;
         if (orbit.flyAnim) {
           const p = Math.min(1, (now - orbit.flyAnim.startTime) / orbit.flyAnim.duration), ease = 1 - Math.pow(1 - p, 3);
           orbit.target.lerpVectors(orbit.flyAnim.startTarget, orbit.flyAnim.endTarget, ease);
@@ -1712,8 +3598,9 @@
         }
       }
 
-      if (state.mode === 'walk') {
+      if (state.mode === 'walk' || state.mode === 'mc') {
         if (state.isDriving) {
+          fpHandGroup.visible = false;
           const carMoveSpeed = (state.sprint ? 32 : 20) * dt;
           const turnRate = 1.9 * dt;
           let driveDir = 0;
@@ -1723,8 +3610,8 @@
           if (keys.e || keys.d) drivableCar.rotY -= turnRate * (driveDir >= 0 ? 1 : -1);
 
           if (driveDir !== 0) {
-            const nx = Math.max(-108, Math.min(108, drivableCar.x - Math.sin(drivableCar.rotY) * driveDir * carMoveSpeed));
-            const nz = Math.max(-68, Math.min(75, drivableCar.z - Math.cos(drivableCar.rotY) * driveDir * carMoveSpeed));
+            const nx = Math.max(-115, Math.min(115, drivableCar.x - Math.sin(drivableCar.rotY) * driveDir * carMoveSpeed));
+            const nz = Math.max(-72, Math.min(78, drivableCar.z - Math.cos(drivableCar.rotY) * driveDir * carMoveSpeed));
             [drivableCar.x, drivableCar.z] = applyCorridorWallCollision(nx, nz, 1.35);
             drivableCar.wheels.forEach(w => { w.rotation.x -= driveDir * carMoveSpeed * 1.6; });
           }
@@ -1737,18 +3624,24 @@
           camera.position.lerp(new THREE.Vector3(desiredCamX, drivableCar.y + 4.2, desiredCamZ), 0.22);
           camera.lookAt(drivableCar.x, drivableCar.y + 1.2, drivableCar.z);
         } else {
-          const moveSpeed = (state.sprint ? 21 : 11.5) * dt, turnSpeed = 2.1 * dt;
+          const moveSpeed = (state.isFlying ? (state.sprint ? 26 : 15) : (state.sprint ? 19 : 10.5)) * dt;
+          const turnSpeed = 2.0 * dt;
           if (keys.q) character.rotY += turnSpeed;
           if (keys.e) character.rotY -= turnSpeed;
+          if (state.mode === 'mc') {
+            const pitchSpeed = 1.65 * dt;
+            if (keys.pitchUp) character.pitch = Math.min(1.25, character.pitch + pitchSpeed);
+            if (keys.pitchDown) character.pitch = Math.max(-1.35, character.pitch - pitchSpeed);
+          }
           let forwardInput = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
           let strafeInput = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
 
           if (forwardInput !== 0 || strafeInput !== 0) {
             const fx = -Math.sin(character.rotY), fz = -Math.cos(character.rotY);
             const rx = Math.cos(character.rotY), rz = -Math.sin(character.rotY);
-            let nx = Math.max(-108, Math.min(108, character.x + (fx * forwardInput + rx * strafeInput) * moveSpeed));
-            let nz = Math.max(-68, Math.min(72, character.z + (fz * forwardInput + rz * strafeInput) * moveSpeed));
-            [character.x, character.z] = applyCorridorWallCollision(nx, nz, 0.45);
+            let nx = Math.max(-125, Math.min(125, character.x + (fx * forwardInput + rx * strafeInput) * moveSpeed));
+            let nz = Math.max(-85, Math.min(85, character.z + (fz * forwardInput + rz * strafeInput) * moveSpeed));
+            [character.x, character.z] = applyCorridorWallCollision(nx, nz, 0.42);
             character.walkCycle += dt * (state.sprint ? 15 : 9);
             const swing = Math.sin(character.walkCycle) * 0.55;
             charLeftLeg.rotation.x = swing; charRightLeg.rotation.x = -swing;
@@ -1759,39 +3652,117 @@
           }
 
           const groundY = computeGroundAndStairElevation(character.x, character.z);
-          if (!character.onGround) {
-            character.vy -= 19.6 * dt; character.y += character.vy * dt;
-            if (character.y <= groundY) { character.y = groundY; character.vy = 0; character.onGround = true; }
-          } else character.y += (groundY - character.y) * 0.35;
+          if (state.isFlying && state.mode === 'mc') {
+            const flyVertSpeed = (state.sprint ? 16 : 10) * dt;
+            if (keys.flyUp) character.y = Math.min(75, character.y + flyVertSpeed);
+            if (keys.flyDown) character.y = Math.max(groundY, character.y - flyVertSpeed);
+            if (character.y <= groundY + 0.05 && keys.flyDown) {
+              character.y = groundY;
+            }
+            updateCharacterFloorBadge();
+          } else {
+            if (!character.onGround) {
+              character.vy -= 21.0 * dt;
+              character.y += character.vy * dt;
+              if (character.y <= groundY) {
+                character.y = groundY;
+                character.vy = 0;
+                character.onGround = true;
+              }
+            } else {
+              if (groundY > character.y + 0.05) {
+                character.y += (groundY - character.y) * 0.4;
+              } else if (groundY < character.y - 0.15) {
+                character.onGround = false;
+              } else {
+                character.y = groundY;
+              }
+            }
+          }
 
           character.group.position.set(character.x, character.y, character.z);
           character.group.rotation.y = character.rotY;
 
-          if (state.walkPov === 'third') {
-            character.group.visible = true;
-            camera.position.lerp(new THREE.Vector3(character.x + Math.sin(character.rotY) * 7.2, character.y + 2.85, character.z + Math.cos(character.rotY) * 7.2), 0.22);
-            camera.lookAt(character.x, character.y + 1.85, character.z);
+          if (state.mode === 'walk') {
+            // 原版「人物自由走動」鏡頭模式（無手持麥塊方塊、無俯仰建造黑框）
+            fpHandGroup.visible = false;
+            if (state.walkPov === 'third') {
+              character.group.visible = true;
+              const desiredCamX = character.x + Math.sin(character.rotY) * 6.8;
+              const desiredCamZ = character.z + Math.cos(character.rotY) * 6.8;
+              camera.position.lerp(new THREE.Vector3(desiredCamX, character.y + 3.4, desiredCamZ), 0.25);
+              camera.lookAt(character.x, character.y + 1.5, character.z);
+            } else {
+              character.group.visible = false;
+              const eyeX = character.x - Math.sin(character.rotY) * 0.2;
+              const eyeZ = character.z - Math.cos(character.rotY) * 0.2;
+              camera.position.set(eyeX, character.y + 2.0, eyeZ);
+              camera.lookAt(character.x - Math.sin(character.rotY) * 10, character.y + 1.9, character.z - Math.cos(character.rotY) * 10);
+            }
           } else {
-            character.group.visible = false;
-            camera.position.set(character.x, character.y + 2.15, character.z);
-            camera.lookAt(character.x - Math.sin(character.rotY) * 12, character.y + 2.08, character.z - Math.cos(character.rotY) * 12);
+            // ⛏️ 麥塊建造模式鏡頭（支援上下視角 pitch 與第一人稱右手持方塊）
+            const cosP = Math.cos(character.pitch), sinP = Math.sin(character.pitch);
+            const lookDirX = -Math.sin(character.rotY) * cosP;
+            const lookDirY = sinP;
+            const lookDirZ = -Math.cos(character.rotY) * cosP;
+
+            if (state.walkPov === 'third') {
+              character.group.visible = true;
+              fpHandGroup.visible = false;
+              const camDist = 6.8;
+              const targetCamPos = new THREE.Vector3(
+                character.x - lookDirX * camDist,
+                Math.max(groundY + 0.6, character.y + 2.2 - lookDirY * (camDist * 0.65)),
+                character.z - lookDirZ * camDist
+              );
+              camera.position.lerp(targetCamPos, 0.28);
+              camera.lookAt(character.x + lookDirX * 6, character.y + 1.85 + lookDirY * 6, character.z + lookDirZ * 6);
+            } else {
+              character.group.visible = false;
+              fpHandGroup.visible = true;
+              const eyeY = character.y + 2.15;
+              camera.position.set(character.x, eyeY, character.z);
+              camera.lookAt(character.x + lookDirX * 15, eyeY + lookDirY * 15, character.z + lookDirZ * 15);
+
+              // First-person held block bobbing & swing animation
+              if (fpHandSwing > 0) fpHandSwing = Math.max(0, fpHandSwing - dt * 4.8);
+              const bob = Math.sin(character.walkCycle) * 0.025;
+              const swingOffset = Math.sin(fpHandSwing * Math.PI) * 0.18;
+              fpHandGroup.position.set(0.42 - swingOffset * 0.5, -0.34 + bob - swingOffset * 0.4, -0.68 - swingOffset);
+              fpHandGroup.rotation.set(-swingOffset * 1.4, -fpHandSwing * 0.5, 0);
+            }
           }
         }
-      } else character.group.visible = !state.isDriving;
+      } else {
+        character.group.visible = !state.isDriving;
+      }
 
       if (charRing) { const s = 1 + Math.sin(now * 0.005) * 0.12; charRing.scale.set(s, s, 1); }
+      updateCrosshairVoxelPreview();
       update3DLabelsProjection();
       drawMinimap();
       renderer.render(scene, camera);
     }
 
     window.addEventListener('load', () => {
+      preloadAllBlockMaterials();
       buildCampusScene();
       buildCharacterAvatar();
+      initFirstPersonHand();
       init3DLabels();
       renderSidebarList();
+      renderHotbarAndInventoryUI();
       updateOrbitCamera();
-      if (!state.sidebarOpen) document.getElementById('sidebar-panel').style.transform = 'translateX(-110%)';
+      setNavigationMode('mc');
+      syncLabelButtonsUI();
+      if (state.minimapCollapsed) {
+        document.getElementById('minimap-body').classList.add('hidden');
+        document.getElementById('btn-toggle-minimap').textContent = '展開';
+      }
+      // 載入瀏覽器自動存檔；若首次進入無存檔，則預設建立示範紫蝶拱門與木亭
+      if (!loadAutoSavedBlocksFromLocal()) {
+        buildStarterDemoCreation(false);
+      }
       requestAnimationFrame(animate);
     });
   </script>
